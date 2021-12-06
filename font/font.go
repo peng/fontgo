@@ -1,73 +1,71 @@
 package font
 
 import (
-	"bytes"
 	"encoding/binary"
 	"os"
 )
 
-type offsetTableStruct struct {
-	scalerType uint32
-	numTables uint16
-	searchRange uint16
-	entrySelector uint16
-	rangeShift uint16
+type OffsetTable struct {
+	ScalerType    uint32
+	NumTables     uint16
+	SearchRange   uint16
+	EntrySelector uint16
+	RangeShift    uint16
 }
 
-type tagItemStruct struct {
-	checkSum uint32
-	offset uint32
-	length uint32
+type TagItem struct {
+	CheckSum uint32
+	Offset   uint32
+	Length   uint32
 }
 
-type DirectoryStruct struct {
-	offsetTable offsetTableStruct
-	tableContent map[string] tagItemStruct
+type Directory struct {
+	OffsetTable  *OffsetTable
+	TableContent map[string]*TagItem
 }
 
-func DataReader (filePath string) (directory DirectoryStruct, readErr error) {
-	fileByte, err := os.ReadFile(filePath)
+func DataReader(filePath string) (directory *Directory, err error) {
+	var fileByte []byte
+	fileByte, err = os.ReadFile(filePath)
 
 	if err != nil {
-		readErr = err
 		return
 	}
 
-	buf := bytes.NewBuffer(fileByte)
-
 	// read offset table
-	var offsetTable offsetTableStruct
-	// offsetTable := new(offsetTableStruct)
-	offsetTable.scalerType = getUint32(buf.Next(4))
-	offsetTable.numTables = getUint16(buf.Next(2))
-	offsetTable.searchRange = getUint16(buf.Next(2))
-	offsetTable.entrySelector = getUint16(buf.Next(2))
-	offsetTable.rangeShift = getUint16(buf.Next(2))
-
-	// read table content
-
-	tableContent := make(map[string]tagItemStruct)
-	numTables := int(offsetTable.numTables)
-	for i := 0; i < numTables; i++ {
-		tagName := getTag(buf.Next(4))
-		tableContent[tagName] = tagItemStruct{
-			getUint32(buf.Next(4)),
-			getUint32(buf.Next(4)),
-			getUint32(buf.Next(4)),
-		}
+	offsetTable := &OffsetTable{
+		getUint32(fileByte[:4]),
+		getUint16(fileByte[4:6]),
+		getUint16(fileByte[6:8]),
+		getUint16(fileByte[8:10]),
+		getUint16(fileByte[10:12]),
 	}
 
-	directory = DirectoryStruct{offsetTable, tableContent}
-	// fmt.Printf("%v \n", directory)
+	// read table content
+	tableContent := make(map[string]*TagItem)
+	numTables := int(offsetTable.NumTables)
+	pos := 12
+	for i := 0; i < numTables; i++ {
+		tagName := getTag(fileByte[pos : pos+4])
+		pos += 4
+		tableContent[tagName] = &TagItem{
+			getUint32(fileByte[pos : pos+4]),
+			getUint32(fileByte[pos+4 : pos+8]),
+			getUint32(fileByte[pos+8 : pos+12]),
+		}
+		pos += 12
+	}
+
+	directory = &Directory{offsetTable, tableContent}
 	return
 }
 
-func getUint32(data []byte) uint32{
+func getUint32(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
 func getUint16(data []byte) uint16 {
-	return binary.BigEndian.Uint16(data)	
+	return binary.BigEndian.Uint16(data)
 }
 
 func getTag(data []byte) string {
