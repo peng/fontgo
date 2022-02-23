@@ -68,7 +68,11 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		return
 	}
 
+	// head content
 	headContent := GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
+
+	// glyf
+	
 
 	directory = &Directory{offsetTable, tableContent, headContent}
 	return

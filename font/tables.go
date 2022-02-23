@@ -69,6 +69,31 @@ type GlyphCompound struct {
 	argument2  int
 }
 
-func Glyphs(data []byte) {
+func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
+	return &GlyphSimple{
+		getInt16(data[0:2]),
+		getFword(data[2:6]),
+		getFword(data[6:10]),
+		getFword(data[10:14]),
+		getFword(data[14:18]),
+	}
+	pos := 0
+	numberOfContours := getInt16(data[pos:2])
+	xMin := getFword(data[2:6])
+	yMin := getFword(data[6:10])
+	xMax := getFword(data[10:14])
+	yMax := getFword(data[14:18])
+}
 
+func GetGlyphs(data []byte) {
+	sinpLen, compoundLen := 0,10
+	pos := 0
+
+	numberOfContours := getInt16(data[pos:pos+2])
+
+	if numberOfContours >= 0 {
+		// simple
+	} else {
+		// compound
+	}
 }
