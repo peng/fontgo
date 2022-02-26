@@ -2,7 +2,6 @@ package font
 
 import (
 	"encoding/binary"
-	"errors"
 	"os"
 	"strconv"
 	"time"
@@ -22,10 +21,16 @@ type TagItem struct {
 	Length   uint32
 }
 
+type Tables struct {
+	Head *Head
+	Maxp *Maxp
+	Loca []uint16
+}
+
 type Directory struct {
 	OffsetTable  *OffsetTable
 	TableContent map[string]*TagItem
-	Head         *Head
+	Tables *Tables
 }
 
 func DataReader(filePath string) (directory *Directory, err error) {
@@ -60,21 +65,18 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		pos += 12
 	}
 
-	headInfo, isPresent := tableContent["head"]
+	headInfo := tableContent["head"]
+	maxpInfo := tableContent["maxp"]
+	locaInfo := tableContent["loca"]
 
-	if !isPresent {
-		warnWords := "DON'T SUPPORT THIS TABLE"
-		err = errors.New(warnWords)
-		return
-	}
-
-	// head content
-	headContent := GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
-
-	// glyf
+	// tables content
+	tables := new(Tables)
+	tables.Head = GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
+	tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])
+	tables.Loca = GetLoca(fileByte[locaInfo.Offset : locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
 	
 
-	directory = &Directory{offsetTable, tableContent, headContent}
+	directory = &Directory{offsetTable, tableContent, tables}
 	return
 }
 
@@ -136,6 +138,7 @@ func getLongDateTime(data []byte) string {
 }
 
 func getVersion(data []byte) string {
+	// 32 bytes
 	major := strconv.Itoa(int(getUint16(data[:2])))
 	minor := strconv.Itoa(int(getUint16(data[2:4])))
 	return major + "." + minor
