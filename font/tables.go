@@ -69,34 +69,31 @@ type GlyphCompound struct {
 	argument2  int
 }
 
-// func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
-// 	return &GlyphSimple{
-// 		getInt16(data[0:2]),
-// 		getFword(data[2:6]),
-// 		getFword(data[6:10]),
-// 		getFword(data[10:14]),
-// 		getFword(data[14:18]),
-// 	}
-// 	pos := 0
-// 	numberOfContours := getInt16(data[pos:2])
-// 	xMin := getFword(data[2:6])
-// 	yMin := getFword(data[6:10])
-// 	xMax := getFword(data[10:14])
-// 	yMax := getFword(data[14:18])
-// }
+func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
+	simple := new(GlyphSimple)
 
-// func GetGlyphs(data []byte) {
-// 	sinpLen, compoundLen := 0,10
-// 	pos := 0
+	simple.numberOfContours = getInt16(data[0:2])
+	simple.xMin = getFword(data[2:6])
+	simple.yMin = getFword(data[6:10])
+	simple.xMax = getFword(data[10:14])
+	simple.yMax = getFword(data[14:18])
 
-// 	numberOfContours := getInt16(data[pos:pos+2])
+	pos := 18
+	// get endPtsOfContours
+	for i := 0; i < int(simple.numberOfContours); i++ {
+		simple.endPtsOfContours = append(simple.endPtsOfContours, getUint16(data[pos:pos+2]))
+		pos += 2
+	}
 
-// 	if numberOfContours >= 0 {
-// 		// simple
-// 	} else {
-// 		// compound
-// 	}
-// }
+	// get instructionLength
+	simple.instructionLength = getUint16(data[pos:pos + 2])
+	for i := 0; i < int(simple.instructionLength); i++ {
+		simple.instructions = append(simple.instructions, getUint8(data[pos:pos+1]))
+		// test pos++
+		pos++
+	}
+
+}
 
 type Maxp struct {
 	Version string
