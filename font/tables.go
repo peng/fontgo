@@ -95,6 +95,19 @@ func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
 
 }
 
+// func GetGlyphs(data []byte) {
+// 	sinpLen, compoundLen := 0,10
+// 	pos := 0
+
+// 	numberOfContours := getInt16(data[pos:pos+2])
+
+// 	if numberOfContours >= 0 {
+// 		// simple
+// 	} else {
+// 		// compound
+// 	}
+// }
+
 type Maxp struct {
 	Version string
 	NumGlyphs uint16
