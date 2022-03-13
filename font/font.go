@@ -30,7 +30,7 @@ type Tables struct {
 type Directory struct {
 	OffsetTable  *OffsetTable
 	TableContent map[string]*TagItem
-	Tables *Tables
+	Tables       *Tables
 }
 
 func DataReader(filePath string) (directory *Directory, err error) {
@@ -73,8 +73,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	tables := new(Tables)
 	tables.Head = GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
 	tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])
-	tables.Loca = GetLoca(fileByte[locaInfo.Offset : locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
-	
+	tables.Loca = GetLoca(fileByte[locaInfo.Offset:locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
 
 	directory = &Directory{offsetTable, tableContent, tables}
 	return
