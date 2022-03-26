@@ -43,22 +43,26 @@ func GetHead(data []byte) *Head {
 	}
 }
 
-type Point8 struct {
-	X uint8 `json:"x"`
-	Y uint8 `json:"y"`
+type Flag struct {
+	OnCurve      bool `json:"onCurve"`
+	XShortVector bool `json:"xShortVector`
+	YShortVector bool `json:"yShortVector"`
+	XSame        bool `json:"xSame"`
+	YSame        bool `json:"ySave"`
 }
-
-type Point16 struct {
-	X uint16 `json:"x"`
-	Y uint16 `json:"y"`
+type Point struct {
+	X    int   `json:"x"`
+	Y    int   `json:"y"`
+	Flag *Flag `json:"flag"`
 }
 
 type GlyphCommon struct {
-	NumberOfContours int16 `json:"numberOfContours"`
-	XMin             int32 `json:"xMin"`
-	YMin             int32 `json:"yMin"`
-	XMax             int32 `json:"xMax"`
-	YMax             int32 `json:"yMax"`
+	NumberOfContours int16  `json:"numberOfContours"`
+	XMin             int32  `json:"xMin"`
+	YMin             int32  `json:"yMin"`
+	XMax             int32  `json:"xMax"`
+	YMax             int32  `json:"yMax"`
+	Type             string `json:"type"`
 }
 
 type GlyphSimple struct {
@@ -66,9 +70,7 @@ type GlyphSimple struct {
 	EndPtsOfContours  []uint16 `json:"endPtsOfContours"`
 	InstructionLength uint16   `json:"instructionLength"`
 	Instructions      []uint8  `json:"instructions"`
-	Flags             []uint8  `json:"flags"`
-	Point8            Point8   `json:"point8,omitempty"`
-	Point16           Point16  `json:"point16,omitempty`
+	Points            []*Point `json:"points"`
 }
 
 type GlyphCompound struct {
@@ -79,9 +81,10 @@ type GlyphCompound struct {
 	argument2  int
 }
 
-func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
-	simple := new(GlyphSimple)
+const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
+func GetGlyphSimple(data []byte) (simple *GlyphSimple) {
+	simple.Type = GLYPH_TYPE_SIMPLE
 	simple.NumberOfContours = getInt16(data[0:2])
 	simple.XMin = getFword(data[2:6])
 	simple.YMin = getFword(data[6:10])
@@ -104,22 +107,82 @@ func GetGlyphSimple(data []byte) (glyph *GlyphSimple) {
 	}
 
 	// get points num
-	pointsNum := simple.EndPtsOfContours[0]
+	pointsNum := int(simple.EndPtsOfContours[0])
 
 	for _, num := range simple.EndPtsOfContours {
-		if num > pointsNum {
-			pointsNum = num
+		contoursNum := int(num)
+		if contoursNum > pointsNum {
+			pointsNum = contoursNum
 		}
 	}
 
+	var flags []uint8
+
 	// get flags
-	for i := 0; i < int(pointsNum); i++ {
-		simple.Flags = append(simple.Flags, getUint8(data[pos:pos+1]))
+	for i := 0; i < pointsNum; i++ {
+		f := getUint8(data[pos : pos+1])
+		flags = append(flags, f)
 		pos++
+
+		if f&0x08 == 1 {
+			repeatNum := int(getUint8(data[pos : pos+1]))
+			pos++
+
+			for j := 0; j < repeatNum; j++ {
+				flags = append(flags, getUint8(data[pos:pos+1]))
+				pos++
+			}
+			i += repeatNum
+		}
 	}
 
-	//
+	// should check number of flags same with points
 
+	// get x points
+	for i := 0; i < pointsNum; i++ {
+
+		flagBit := flags[i]
+
+		flag := &Flag{
+			flagBit&0x01 == 1,
+			flagBit&0x02 == 1,
+			flagBit&0x04 == 1,
+			flagBit&0x10 == 1,
+			flagBit&0x20 == 1,
+		}
+
+		var point Point
+		point.Flag = flag
+		if flag.XShortVector {
+			point.X = int(getUint8(data[pos : pos+1]))
+			pos++
+		} else {
+			point.X = int(getUint16(data[pos : pos+2]))
+			pos += 2
+		}
+
+		simple.Points = append(simple.Points, &point)
+	}
+
+	// get y points
+	for i := 0; i < pointsNum; i++ {
+		var y int
+		point := simple.Points[i]
+		if point.Flag.YShortVector {
+			y = int(getUint8(data[pos : pos+1]))
+			pos++
+		} else {
+			y = int(getUint16(data[pos : pos+2]))
+			pos += 2
+		}
+		point.Y = y
+	}
+
+	return simple
+}
+
+func GetGlyphCompound(data []byte) (compound *GlyphCompound) {
+	compound.Type = GLYPH_TYPE_COMPOUND
 }
 
 // func GetGlyphs(data []byte) {
