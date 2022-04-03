@@ -73,17 +73,29 @@ type GlyphSimple struct {
 	Points            []*Point `json:"points"`
 }
 
+type Component struct {
+	Flags      uint16
+	GlyphIndex uint16
+	Argument1  int
+	Argument2  int
+	unsign     bool
+	scale      float32
+	xscale     float32
+	yscale     float32
+	scale01    float32
+	scale10    float32
+}
+
 type GlyphCompound struct {
 	GlyphCommon
-	Flags      uint16
-	glyphIndex uint16
-	argument1  int
-	argument2  int
+	Component         []Component
+	instructionLength int
+	instructions      []uint8
 }
 
 const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
-func GetGlyphSimple(data []byte) (simple *GlyphSimple) {
+func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
 	simple.Type = GLYPH_TYPE_SIMPLE
 	simple.NumberOfContours = getInt16(data[0:2])
 	simple.XMin = getFword(data[2:6])
@@ -91,7 +103,7 @@ func GetGlyphSimple(data []byte) (simple *GlyphSimple) {
 	simple.XMax = getFword(data[10:14])
 	simple.YMax = getFword(data[14:18])
 
-	pos := 18
+	pos = 18
 	// get endPtsOfContours
 	for i := 0; i < int(simple.NumberOfContours); i++ {
 		simple.EndPtsOfContours = append(simple.EndPtsOfContours, getUint16(data[pos:pos+2]))
@@ -178,18 +190,109 @@ func GetGlyphSimple(data []byte) (simple *GlyphSimple) {
 		point.Y = y
 	}
 
-	return simple
+	return
 }
 
-func GetGlyphCompound(data []byte) (compound *GlyphCompound) {
+func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	compound.Type = GLYPH_TYPE_COMPOUND
+	const (
+		ARG_1_AND_2_ARE_WORDS    = 0x0001
+		ARGS_ARE_XY_VALUES       = 0x0002
+		ROUND_XY_TO_GRID         = 0x0004
+		WE_HAVE_A_SCALE          = 0x0008
+		MORE_COMPONENTS          = 0x0020
+		WE_HAVE_AN_X_AND_Y_SCALE = 0x0040
+		WE_HAVE_A_TWO_BY_TWO     = 0x0080
+		WE_HAVE_INSTRUCTIONS     = 0x0100
+		USE_MY_METRICS           = 0x0200
+		OVERLAP_COMPOUND         = 0x0400
+	)
+
+	compound.Type = GLYPH_TYPE_COMPOUND
+	compound.NumberOfContours = getInt16(data[0:2])
+	compound.XMin = getFword(data[2:6])
+	compound.YMin = getFword(data[6:10])
+	compound.XMax = getFword(data[10:14])
+	compound.YMax = getFword(data[14:18])
+
+	var flags uint16
+	pos = 18
+
+	moreComponent := true
+
+	for moreComponent {
+		component := new(Component)
+
+		component.Flags = getUint16(data[pos : pos+2])
+		pos += 2
+
+		flags = component.Flags
+
+		if flags&ARG_1_AND_2_ARE_WORDS == 1 {
+			if flags&ARGS_ARE_XY_VALUES == 1 {
+				component.Argument1 = int(getInt16(data[pos : pos+2]))
+				pos += 2
+				component.Argument2 = int(getInt16(data[pos : pos+2]))
+			} else {
+				component.unsign = true
+				component.Argument1 = int(getUint16(data[pos : pos+2]))
+				pos += 2
+				component.Argument2 = int(getUint16(data[pos : pos+2]))
+			}
+			pos += 2
+		} else {
+			if flags&ARGS_ARE_XY_VALUES == 1 {
+				component.Argument1 = int(getInt8(data[pos : pos+1]))
+				pos++
+				component.Argument2 = int(getInt8(data[pos : pos+1]))
+			} else {
+				component.unsign = true
+				component.Argument1 = int(getUint8(data[pos : pos+1]))
+				pos++
+				component.Argument2 = int(getUint8(data[pos : pos+1]))
+			}
+			pos++
+		}
+
+		if flags&WE_HAVE_A_SCALE == 1 {
+			component.scale = get2Dot14(data[pos : pos+2])
+		} else if flags&WE_HAVE_AN_X_AND_Y_SCALE == 1 {
+			component.xscale = get2Dot14((data[pos : pos+2]))
+			pos += 2
+			component.yscale = get2Dot14(data[pos : pos+2])
+		} else if flags&WE_HAVE_A_TWO_BY_TWO == 1 {
+			component.xscale = get2Dot14(data[pos : pos+2])
+			pos += 2
+			component.scale01 = get2Dot14(data[pos : pos+2])
+			pos += 2
+			component.scale10 = get2Dot14(data[pos : pos+2])
+			pos += 2
+			component.xscale = get2Dot14(data[pos : pos+2])
+		}
+		pos += 2
+
+		moreComponent = flags&MORE_COMPONENTS == 1
+	}
+
+	// can't understand
+	if flags&WE_HAVE_INSTRUCTIONS == 1 {
+		compound.instructionLength = int(getUint16(data[pos : pos+2]))
+		pos += 2
+
+		for i := 0; i < compound.instructionLength; i++ {
+			compound.instructions = append(compound.instructions, getUint8(data[pos:pos+1]))
+			pos++
+		}
+	}
+
+	return
 }
 
 // func GetGlyphs(data []byte) {
-// 	sinpLen, compoundLen := 0,10
+// 	sinpLen, compoundLen := 0, 10
 // 	pos := 0
 
-// 	numberOfContours := getInt16(data[pos:pos+2])
+// 	numberOfContours := getInt16(data[pos : pos+2])
 
 // 	if numberOfContours >= 0 {
 // 		// simple
