@@ -58,10 +58,10 @@ type Point struct {
 
 type GlyphCommon struct {
 	NumberOfContours int16  `json:"numberOfContours"`
-	XMin             int32  `json:"xMin"`
-	YMin             int32  `json:"yMin"`
-	XMax             int32  `json:"xMax"`
-	YMax             int32  `json:"yMax"`
+	XMin             int16  `json:"xMin"`
+	YMin             int16  `json:"yMin"`
+	XMax             int16  `json:"xMax"`
+	YMax             int16  `json:"yMax"`
 	Type             string `json:"type"`
 }
 
@@ -93,17 +93,23 @@ type GlyphCompound struct {
 	instructions      []uint8
 }
 
+type Glyphs struct {
+	Simples   []GlyphSimple
+	Compounds []GlyphCompound
+}
+
 const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
 func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
+	simple = new(GlyphSimple)
 	simple.Type = GLYPH_TYPE_SIMPLE
 	simple.NumberOfContours = getInt16(data[0:2])
-	simple.XMin = getFword(data[2:6])
-	simple.YMin = getFword(data[6:10])
-	simple.XMax = getFword(data[10:14])
-	simple.YMax = getFword(data[14:18])
+	simple.XMin = getFword(data[2:4])
+	simple.YMin = getFword(data[4:6])
+	simple.XMax = getFword(data[6:8])
+	simple.YMax = getFword(data[8:10])
 
-	pos = 18
+	pos = 10
 	// get endPtsOfContours
 	for i := 0; i < int(simple.NumberOfContours); i++ {
 		simple.EndPtsOfContours = append(simple.EndPtsOfContours, getUint16(data[pos:pos+2]))
@@ -194,6 +200,7 @@ func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
 }
 
 func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
+	compound = new(GlyphCompound)
 	compound.Type = GLYPH_TYPE_COMPOUND
 	const (
 		ARG_1_AND_2_ARE_WORDS    = 0x0001
@@ -210,13 +217,13 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 
 	compound.Type = GLYPH_TYPE_COMPOUND
 	compound.NumberOfContours = getInt16(data[0:2])
-	compound.XMin = getFword(data[2:6])
-	compound.YMin = getFword(data[6:10])
-	compound.XMax = getFword(data[10:14])
-	compound.YMax = getFword(data[14:18])
+	compound.XMin = getFword(data[2:4])
+	compound.YMin = getFword(data[4:6])
+	compound.XMax = getFword(data[6:8])
+	compound.YMax = getFword(data[8:10])
 
 	var flags uint16
-	pos = 18
+	pos = 10
 
 	moreComponent := true
 
@@ -288,18 +295,31 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	return
 }
 
-// func GetGlyphs(data []byte) {
-// 	sinpLen, compoundLen := 0, 10
-// 	pos := 0
+func GetGlyphs(data []byte, loca []uint16) (glyphs *Glyphs) {
+	glyphs = new(Glyphs)
 
-// 	numberOfContours := getInt16(data[pos : pos+2])
+	for i := 0; i < 30; i++ {
 
-// 	if numberOfContours >= 0 {
-// 		// simple
-// 	} else {
-// 		// compound
-// 	}
-// }
+		offset := int(loca[i])
+		nextOffset := int(loca[i+1])
+		// fmt.Printf("innoffset %v", offset)
+		// fmt.Printf("innnextoffset %v", nextOffset)
+		numberOfContours := getInt16(data[offset : offset+2])
+
+		if offset != nextOffset {
+			if numberOfContours >= 0 {
+				// simple
+				simp, _ := GetGlyphSimple(data[offset:])
+				glyphs.Simples = append(glyphs.Simples, *simp)
+			} else {
+				// compound
+				compound, _ := GetGlyphCompound(data[offset:])
+				glyphs.Compounds = append(glyphs.Compounds, *compound)
+			}
+		}
+	}
+	return
+}
 
 type Maxp struct {
 	Version               string

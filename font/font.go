@@ -31,6 +31,7 @@ type Directory struct {
 	OffsetTable  *OffsetTable
 	TableContent map[string]*TagItem
 	Tables       *Tables
+	Glyphs       *Glyphs
 }
 
 func DataReader(filePath string) (directory *Directory, err error) {
@@ -75,7 +76,16 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])
 	tables.Loca = GetLoca(fileByte[locaInfo.Offset:locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
 
-	directory = &Directory{offsetTable, tableContent, tables}
+	directory = new(Directory)
+
+	directory.OffsetTable = offsetTable
+	directory.TableContent = tableContent
+	directory.Tables = tables
+	glyfStart := tableContent["glyf"].Offset
+	// glyfEnd := glyfStart + tableContent["glyf"].Length
+	directory.Glyphs = GetGlyphs(fileByte[glyfStart:], tables.Loca)
+
+	// directory = &Directory{offsetTable, tableContent, tables}
 	return
 }
 
@@ -119,8 +129,8 @@ func getFixed(data []byte) float64 {
 	return float64(getInt32(data) / 65535)
 }
 
-func getFword(data []byte) int32 {
-	return getInt32(data)
+func getFword(data []byte) int16 {
+	return getInt16(data)
 }
 
 func get2Dot14(data []byte) float32 {
