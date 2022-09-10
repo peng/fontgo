@@ -8,30 +8,30 @@ import (
 )
 
 type OffsetTable struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
+	ScalerType    uint32 `json:"scalerType"`
+	NumTables     uint16 `json:"numTables"`
+	SearchRange   uint16 `json:"searchRange"`
+	EntrySelector uint16 `json:"entrySelector"`
+	RangeShift    uint16 `json:"rangeShift"`
 }
 
 type TagItem struct {
-	CheckSum uint32
-	Offset   uint32
-	Length   uint32
+	CheckSum uint32 `json:"checkSum"`
+	Offset   uint32 `json:"offset"`
+	Length   uint32 `json:"length"`
 }
 
 type Tables struct {
-	Head *Head
-	Maxp *Maxp
-	Loca []uint16
+	Head *Head `json:"head"`
+	Maxp *Maxp `json:"maxp`
+	Loca []uint16 `json:"loca"`
 }
 
 type Directory struct {
-	OffsetTable  *OffsetTable
-	TableContent map[string]*TagItem
-	Tables       *Tables
-	Glyphs       *Glyphs
+	OffsetTable  *OffsetTable `json:"offsetTable"`
+	TableContent map[string]*TagItem `json:"tableContent"`
+	Tables       *Tables `json:"tables"`
+	Glyphs       *Glyphs `json:"glyphs"`
 }
 
 func DataReader(filePath string) (directory *Directory, err error) {

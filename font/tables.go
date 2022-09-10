@@ -2,23 +2,23 @@ package font
 
 // 首字符小写无法JSON解析
 type Head struct {
-	Version            string
-	FontRevision       float64
-	CheckSumAdjustment uint32
-	MagicNumber        uint32
-	Flags              uint16
-	UnitsPerEm         uint16
-	Created            string
-	Modified           string
-	XMin               int32
-	YMin               int32
-	XMax               int32
-	YMax               int32
-	MacStyle           uint16
-	LowestRecPPEM      uint16
-	FontDirectionHint  int16
-	IndexToLocFormat   int16
-	GlyphDataFormat    int16
+	Version            string `json:"version"`
+	FontRevision       float64 `json:"fontRevision"`
+	CheckSumAdjustment uint32 `json:"checkSumAdjustment"`
+	MagicNumber        uint32 `json:"magicNumber"`
+	Flags              uint16 `json:"flags"`
+	UnitsPerEm         uint16 `json:"unitsPerEm"`
+	Created            string `json:"created"`
+	Modified           string `json:"modified"`
+	XMin               int32 `json:"xMin"`
+	YMin               int32 `json:"yMin"`
+	XMax               int32 `json:"xMax"`
+	YMax               int32 `json:"yMax"`
+	MacStyle           uint16 `json:"macStyle"`
+	LowestRecPPEM      uint16 `json:"lowestRecPpem"`
+	FontDirectionHint  int16 `json:"fontDirectionHint"`
+	IndexToLocFormat   int16 `json:"indexToLocFormat"`
+	GlyphDataFormat    int16 `json:"glyphDataFormat"`
 }
 
 func GetHead(data []byte) *Head {
@@ -74,16 +74,16 @@ type GlyphSimple struct {
 }
 
 type Component struct {
-	Flags      uint16
-	GlyphIndex uint16
-	Argument1  int
-	Argument2  int
-	unsign     bool
-	scale      float32
-	xscale     float32
-	yscale     float32
-	scale01    float32
-	scale10    float32
+	Flags      uint16 `json:"flags"`
+	GlyphIndex uint16 `json:"glyphIndex"`
+	Argument1  int `json:"argument1"`
+	Argument2  int `json:"argument2"`
+	Unsign     bool `json:"unsign"`
+	Scale      float32 `json:"scale"`
+	Xscale     float32 `json:"xscale"`
+	Yscale     float32 `json:"yscale"`
+	Scale01    float32 `json:"scale01"`
+	Scale10    float32 `json:"scale10"`
 }
 
 type GlyphCompound struct {
@@ -241,7 +241,7 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 				pos += 2
 				component.Argument2 = int(getInt16(data[pos : pos+2]))
 			} else {
-				component.unsign = true
+				component.Unsign = true
 				component.Argument1 = int(getUint16(data[pos : pos+2]))
 				pos += 2
 				component.Argument2 = int(getUint16(data[pos : pos+2]))
@@ -253,7 +253,7 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 				pos++
 				component.Argument2 = int(getInt8(data[pos : pos+1]))
 			} else {
-				component.unsign = true
+				component.Unsign = true
 				component.Argument1 = int(getUint8(data[pos : pos+1]))
 				pos++
 				component.Argument2 = int(getUint8(data[pos : pos+1]))
@@ -262,19 +262,19 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 		}
 
 		if flags&WE_HAVE_A_SCALE == 1 {
-			component.scale = get2Dot14(data[pos : pos+2])
+			component.Scale = get2Dot14(data[pos : pos+2])
 		} else if flags&WE_HAVE_AN_X_AND_Y_SCALE == 1 {
-			component.xscale = get2Dot14((data[pos : pos+2]))
+			component.Xscale = get2Dot14((data[pos : pos+2]))
 			pos += 2
-			component.yscale = get2Dot14(data[pos : pos+2])
+			component.Yscale = get2Dot14(data[pos : pos+2])
 		} else if flags&WE_HAVE_A_TWO_BY_TWO == 1 {
-			component.xscale = get2Dot14(data[pos : pos+2])
+			component.Xscale = get2Dot14(data[pos : pos+2])
 			pos += 2
-			component.scale01 = get2Dot14(data[pos : pos+2])
+			component.Scale01 = get2Dot14(data[pos : pos+2])
 			pos += 2
-			component.scale10 = get2Dot14(data[pos : pos+2])
+			component.Scale10 = get2Dot14(data[pos : pos+2])
 			pos += 2
-			component.xscale = get2Dot14(data[pos : pos+2])
+			component.Xscale = get2Dot14(data[pos : pos+2])
 		}
 		pos += 2
 
