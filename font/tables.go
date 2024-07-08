@@ -1,6 +1,40 @@
 package font
 
-// 首字符小写无法JSON解析
+
+type OffsetTable struct {
+	ScalerType    uint32 `json:"scalerType"`
+	NumTables     uint16 `json:"numTables"`
+	SearchRange   uint16 `json:"searchRange"`
+	EntrySelector uint16 `json:"entrySelector"`
+	RangeShift    uint16 `json:"rangeShift"`
+}
+
+func GetOffsetTable(data []byte) *OffsetTable {
+	return &OffsetTable{
+		getUint32(data[:4]),
+		getUint16(data[4:6]),
+		getUint16(data[6:8]),
+		getUint16(data[8:10]),
+		getUint16(data[10:12]),
+	}
+}
+
+func GetTableContent(numTables int, date []byte) map[string]*TagItem{
+	tableContent := make(map[string]*TagItem)
+	pos := 12
+	for i := 0; i < numTables; i++ {
+		tagName := getString(date[pos : pos+4])
+		pos += 4
+		tableContent[tagName] = &TagItem{
+			getUint32(date[pos : pos+4]),
+			getUint32(date[pos+4 : pos+8]),
+			getUint32(date[pos+8 : pos+12]),
+		}
+		pos += 12
+	}
+	return tableContent
+}
+
 type Head struct {
 	Version            string `json:"version"`
 	FontRevision       float64 `json:"fontRevision"`
@@ -377,4 +411,12 @@ func GetLoca(data []byte, numGlyphs uint16, indexToLocFormat int16) []uint16 {
 	}
 
 	return locations
+}
+
+
+type Cmap struct {
+	Version uint16 `json:"version"`
+	NumberSubtables uint16 `json:"numberSubtables"`
+	Format uint16 `json:"format"`
+	
 }
