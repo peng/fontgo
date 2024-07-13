@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -55,6 +56,14 @@ func GetRemoteJson() (data RespData, err error){
 	return
 }
 
+func DiffVal(standData interface{}, inputData interface{}) bool{
+	dataType := reflect.TypeOf(standData).Kind()
+	if dataType == reflect.Struct {
+		// fmt.Println("类型: inin")
+	}
+	return true
+}
+
 func TestGetOffsetTable(t *testing.T) {
 	var (
 		fileByte []byte
@@ -78,6 +87,8 @@ func TestGetOffsetTable(t *testing.T) {
 		t.Fail()
 		return
 	}
+
+	DiffVal(standData, offsetTable)
 
 	if (standData.OffsetTable.EntrySelector != offsetTable.EntrySelector) {
 		t.Log("EntrySelector error")
