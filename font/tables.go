@@ -1,6 +1,5 @@
 package font
 
-
 type OffsetTable struct {
 	ScalerType    uint32 `json:"scalerType"`
 	NumTables     uint16 `json:"numTables"`
@@ -19,7 +18,7 @@ func GetOffsetTable(data []byte) *OffsetTable {
 	}
 }
 
-func GetTableContent(numTables int, date []byte) map[string]*TagItem{
+func GetTableContent(numTables int, date []byte) map[string]*TagItem {
 	tableContent := make(map[string]*TagItem)
 	pos := 12
 	for i := 0; i < numTables; i++ {
@@ -36,23 +35,23 @@ func GetTableContent(numTables int, date []byte) map[string]*TagItem{
 }
 
 type Head struct {
-	Version            string `json:"version"`
+	Version            string  `json:"version"`
 	FontRevision       float64 `json:"fontRevision"`
-	CheckSumAdjustment uint32 `json:"checkSumAdjustment"`
-	MagicNumber        uint32 `json:"magicNumber"`
-	Flags              uint16 `json:"flags"`
-	UnitsPerEm         uint16 `json:"unitsPerEm"`
-	Created            string `json:"created"`
-	Modified           string `json:"modified"`
-	XMin               int32 `json:"xMin"`
-	YMin               int32 `json:"yMin"`
-	XMax               int32 `json:"xMax"`
-	YMax               int32 `json:"yMax"`
-	MacStyle           uint16 `json:"macStyle"`
-	LowestRecPPEM      uint16 `json:"lowestRecPpem"`
-	FontDirectionHint  int16 `json:"fontDirectionHint"`
-	IndexToLocFormat   int16 `json:"indexToLocFormat"`
-	GlyphDataFormat    int16 `json:"glyphDataFormat"`
+	CheckSumAdjustment uint32  `json:"checkSumAdjustment"`
+	MagicNumber        uint32  `json:"magicNumber"`
+	Flags              uint16  `json:"flags"`
+	UnitsPerEm         uint16  `json:"unitsPerEm"`
+	Created            string  `json:"created"`
+	Modified           string  `json:"modified"`
+	XMin               int32   `json:"xMin"`
+	YMin               int32   `json:"yMin"`
+	XMax               int32   `json:"xMax"`
+	YMax               int32   `json:"yMax"`
+	MacStyle           uint16  `json:"macStyle"`
+	LowestRecPPEM      uint16  `json:"lowestRecPpem"`
+	FontDirectionHint  int16   `json:"fontDirectionHint"`
+	IndexToLocFormat   int16   `json:"indexToLocFormat"`
+	GlyphDataFormat    int16   `json:"glyphDataFormat"`
 }
 
 func GetHead(data []byte) *Head {
@@ -108,11 +107,11 @@ type GlyphSimple struct {
 }
 
 type Component struct {
-	Flags      uint16 `json:"flags"`
-	GlyphIndex uint16 `json:"glyphIndex"`
-	Argument1  int `json:"argument1"`
-	Argument2  int `json:"argument2"`
-	Unsign     bool `json:"unsign"`
+	Flags      uint16  `json:"flags"`
+	GlyphIndex uint16  `json:"glyphIndex"`
+	Argument1  int     `json:"argument1"`
+	Argument2  int     `json:"argument2"`
+	Unsign     bool    `json:"unsign"`
 	Scale      float32 `json:"scale"`
 	Xscale     float32 `json:"xscale"`
 	Yscale     float32 `json:"yscale"`
@@ -413,10 +412,8 @@ func GetLoca(data []byte, numGlyphs uint16, indexToLocFormat int16) []uint16 {
 	return locations
 }
 
-
 type Cmap struct {
-	Version uint16 `json:"version"`
+	Version         uint16 `json:"version"`
 	NumberSubtables uint16 `json:"numberSubtables"`
-	Format uint16 `json:"format"`
-	
+	Format          uint16 `json:"format"`
 }

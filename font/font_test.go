@@ -2,10 +2,10 @@ package font
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 )
 
@@ -31,11 +31,11 @@ type File struct {
 	Pos int `json:"pos"`
 }
 type RespData struct {
-	File File `json:"file"`
-	OffsetTable OffsetTable `json:"offsetTable"`
+	File        *File        `json:"file"`
+	OffsetTable *OffsetTable `json:"offsetTable"`
 }
 
-func GetRemoteJson() (data RespData, err error){
+func GetRemoteJson() (data *RespData, err error) {
 	var (
 		resp *http.Response
 		body []byte
@@ -45,30 +45,22 @@ func GetRemoteJson() (data RespData, err error){
 	if err != nil {
 		return
 	}
-	
+
 	body, err = ioutil.ReadAll(resp.Body)
-	
+
 	if err != nil {
 		return
 	}
-	
+
 	err = json.Unmarshal(body, &data)
 	return
 }
 
-func DiffVal(standData interface{}, inputData interface{}) bool{
-	dataType := reflect.TypeOf(standData).Kind()
-	if dataType == reflect.Struct {
-		// fmt.Println("类型: inin")
-	}
-	return true
-}
-
 func TestGetOffsetTable(t *testing.T) {
 	var (
-		fileByte []byte
-		err error
-		standData RespData
+		fileByte  []byte
+		err       error
+		standData *RespData
 	)
 
 	fileByte, err = os.ReadFile("../test/HanyiSentyCrayon.ttf")
@@ -80,42 +72,17 @@ func TestGetOffsetTable(t *testing.T) {
 	}
 
 	offsetTable := GetOffsetTable(fileByte)
-	
+
 	standData, err = GetRemoteJson()
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 		return
 	}
-
-	DiffVal(standData, offsetTable)
-
-	if (standData.OffsetTable.EntrySelector != offsetTable.EntrySelector) {
-		t.Log("EntrySelector error")
-		t.Fail()
-		return
-	}
-
-	if (standData.OffsetTable.NumTables != offsetTable.NumTables) {
-		t.Log("NumTables error")
-		t.Fail()
-		return
-	}
-
-	if (standData.OffsetTable.RangeShift != offsetTable.RangeShift) {
-		t.Log("RangeShift error")
-		t.Fail()
-		return
-	}
-
-	if (standData.OffsetTable.SearchRange != offsetTable.SearchRange) {
-		t.Log("SearchRange error")
-		t.Fail()
-		return
-	}
-
-	if (standData.OffsetTable.ScalerType != offsetTable.ScalerType) {
-		t.Log("ScalerType error", standData.OffsetTable.ScalerType, offsetTable.ScalerType)
+	if *offsetTable != *standData.OffsetTable {
+		fmt.Println("standData offsetTable", standData.OffsetTable)
+		fmt.Println("source offsetTable", offsetTable)
+		t.Log("offsetTable error")
 		t.Fail()
 		return
 	}
