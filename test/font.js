@@ -193,25 +193,26 @@ TrueTypeFont.prototype = {
   readHeadTable: function (file) {
     assert("head" in this.tables);
     file.seek(this.tables["head"].offset);
-
-    this.version = file.getFixed();
-    this.fontRevision = file.getFixed();
-    this.checksumAdjustment = file.getUint32();
-    this.magicNumber = file.getUint32();
-    assert(this.magicNumber === 0x5f0f3cf5);
-    this.flags = file.getUint16();
-    this.unitsPerEm = file.getUint16();
-    this.created = file.getDate();
-    this.modified = file.getDate();
-    this.xMin = file.getFword();
-    this.yMin = file.getFword();
-    this.xMax = file.getFword();
-    this.yMax = file.getFword();
-    this.macStyle = file.getUint16();
-    this.lowestRecPPEM = file.getUint16();
-    this.fontDirectionHint = file.getInt16();
-    this.indexToLocFormat = file.getInt16();
-    this.glyphDataFormat = file.getInt16();
+    const head = {}
+    head.version = file.getFixed();
+    head.fontRevision = file.getFixed();
+    head.checksumAdjustment = file.getUint32();
+    head.magicNumber = file.getUint32();
+    assert(head.magicNumber === 0x5f0f3cf5);
+    head.flags = file.getUint16();
+    head.unitsPerEm = file.getUint16();
+    head.created = file.getDate();
+    head.modified = file.getDate();
+    head.xMin = file.getFword();
+    head.yMin = file.getFword();
+    head.xMax = file.getFword();
+    head.yMax = file.getFword();
+    head.macStyle = file.getUint16();
+    head.lowestRecPPEM = file.getUint16();
+    head.fontDirectionHint = file.getInt16();
+    head.indexToLocFormat = file.getInt16();
+    head.glyphDataFormat = file.getInt16();
+    this.head = head
   },
 
   getGlyphOffset: function (index) {
@@ -220,7 +221,7 @@ TrueTypeFont.prototype = {
     var file = this.file;
     var offset, old;
 
-    if (this.indexToLocFormat === 1) {
+    if (this.head.indexToLocFormat === 1) {
       old = file.seek(table.offset + index * 4);
       offset = file.getUint32();
     } else {

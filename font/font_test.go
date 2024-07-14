@@ -33,6 +33,7 @@ type File struct {
 type RespData struct {
 	File        *File        `json:"file"`
 	OffsetTable *OffsetTable `json:"offsetTable"`
+	Head        *Head        `json:"head"`
 }
 
 func GetRemoteJson() (data *RespData, err error) {
@@ -71,9 +72,23 @@ func TestGetOffsetTable(t *testing.T) {
 		return
 	}
 
+	standData, err = GetRemoteJson()
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+		return
+	}
+	ToffsetTable(t, fileByte, standData)
+}
+
+func ToffsetTable(t *testing.T, fileByte []byte, standData *RespData) {
+	// test offsetTable
+	var (
+		err error
+	)
+
 	offsetTable := GetOffsetTable(fileByte)
 
-	standData, err = GetRemoteJson()
 	if err != nil {
 		t.Log(err)
 		t.Fail()

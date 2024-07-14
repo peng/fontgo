@@ -35,7 +35,7 @@ func GetTableContent(numTables int, date []byte) map[string]*TagItem {
 }
 
 type Head struct {
-	Version            string  `json:"version"`
+	Version            float64 `json:"version"`
 	FontRevision       float64 `json:"fontRevision"`
 	CheckSumAdjustment uint32  `json:"checkSumAdjustment"`
 	MagicNumber        uint32  `json:"magicNumber"`
@@ -56,7 +56,7 @@ type Head struct {
 
 func GetHead(data []byte) *Head {
 	return &Head{
-		getVersion(data[:4]),
+		getFixed(data[:4]),
 		getFixed(data[4:8]),
 		getUint32(data[8:12]),
 		getUint32(data[12:16]),
