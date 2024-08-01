@@ -41,12 +41,12 @@ type Head struct {
 	MagicNumber        uint32  `json:"magicNumber"`
 	Flags              uint16  `json:"flags"`
 	UnitsPerEm         uint16  `json:"unitsPerEm"`
-	Created            string  `json:"created"`
-	Modified           string  `json:"modified"`
-	XMin               int32   `json:"xMin"`
-	YMin               int32   `json:"yMin"`
-	XMax               int32   `json:"xMax"`
-	YMax               int32   `json:"yMax"`
+	Created            int64  `json:"created"`
+	Modified           int64  `json:"modified"`
+	XMin               int16   `json:"xMin"`
+	YMin               int16   `json:"yMin"`
+	XMax               int16   `json:"xMax"`
+	YMax               int16   `json:"yMax"`
 	MacStyle           uint16  `json:"macStyle"`
 	LowestRecPPEM      uint16  `json:"lowestRecPpem"`
 	FontDirectionHint  int16   `json:"fontDirectionHint"`
@@ -64,15 +64,15 @@ func GetHead(data []byte) *Head {
 		getUint16(data[18:20]),
 		getLongDateTime(data[20:28]),
 		getLongDateTime(data[28:36]),
-		getInt32(data[36:40]),
-		getInt32(data[40:44]),
-		getInt32(data[44:48]),
-		getInt32(data[52:56]),
-		getUint16(data[56:58]),
-		getUint16(data[58:60]),
-		getInt16(data[60:62]),
-		getInt16(data[62:64]),
-		getInt16(data[64:66]),
+		getFword(data[36:38]),
+		getFword(data[38:40]),
+		getFword(data[40:42]),
+		getFword(data[42:44]),
+		getUint16(data[44:46]),
+		getUint16(data[46:48]),
+		getInt16(data[48:50]),
+		getInt16(data[50:52]),
+		getInt16(data[52:54]),
 	}
 }
 

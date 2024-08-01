@@ -54,13 +54,14 @@ func get2Dot14(data []byte) float32 {
 	return float32(getInt16(data) / 16384)
 }
 
-func getLongDateTime(data []byte) string {
+func getLongDateTime(data []byte) int64 {
+	// unix second
 	longDateTime := getInt64(data)
 	starTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC).Unix()
 
-	unixTime := longDateTime - starTime
+	unixTime := longDateTime + starTime
 
-	return time.Unix(unixTime, 0).Local().Format(time.UnixDate)
+	return unixTime
 }
 
 func getVersion(data []byte) string {
