@@ -41,8 +41,8 @@ type Head struct {
 	MagicNumber        uint32  `json:"magicNumber"`
 	Flags              uint16  `json:"flags"`
 	UnitsPerEm         uint16  `json:"unitsPerEm"`
-	Created            int64  `json:"created"`
-	Modified           int64  `json:"modified"`
+	Created            int64   `json:"created"`
+	Modified           int64   `json:"modified"`
 	XMin               int16   `json:"xMin"`
 	YMin               int16   `json:"yMin"`
 	XMax               int16   `json:"xMax"`
@@ -416,4 +416,51 @@ type Cmap struct {
 	Version         uint16 `json:"version"`
 	NumberSubtables uint16 `json:"numberSubtables"`
 	Format          uint16 `json:"format"`
+}
+
+type CmapChild struct {
+	PlatformID         uint16 `json:"platformId"`
+	PlatformSpecificID uint16 `json:"platformSpecificId"`
+	Offset             uint16 `json:"offset"`
+}
+
+type CmapFormat0 struct {
+	Format          uint16     `json:"format"`
+	Length          uint16     `json:"length"`
+	Language        uint16     `json:"language"`
+	GlyphIndexArray [256]uint8 `json:"glyphIndexArray"`
+}
+
+type CmapFormat2 struct {
+	Format          uint16      `json:"format"`
+	Length          uint16      `json:"length"`
+	Language        uint16      `json:"language"`
+	SubHeaderKeys   [256]uint16 `json:"subHeaderKeys"`
+	SubHeaders      []uint16    `json:"subHeaders"`
+	GlyphIndexArray []uint16    `json:"glyphIndexArray"`
+}
+
+type CmapFormat4 struct {
+	Format          uint16   `json:"format"`
+	Length          uint16   `json:"length"`
+	Language        uint16   `json:"language"`
+	SegCountX2      uint16   `json:"segCountx2"`
+	SearchRange     uint16   `json:"searchRange"`
+	EntrySelector   uint16   `json:"entrySelector"`
+	RangeShift      uint16   `json:"rangeShift"`
+	EndCode         []uint16 `json:"endCode"`
+	ReservedPad     uint16   `json:"reservedPad"`
+	StartCode       []uint16 `json:"startCode"`
+	IdDelta         []uint16 `json:"idDelta"`
+	IdRangeOffset   []uint16 `json:"idRangeOffset"`
+	GlyphIndexArray []uint16 `json:"glyphIndexArray"`
+}
+
+type CmapFormat6 struct {
+	Format          uint16   `json:"format"`
+	Length          uint16   `json:"length"`
+	Language        uint16   `json:"language"`
+	FirstCode       uint16   `json:"firstCode"`
+	EntryCount      uint16   `json:"entryCount"`
+	GlyphIndexArray []uint16 `json:"glyphIndexArray"`
 }
