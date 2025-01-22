@@ -464,3 +464,47 @@ type CmapFormat6 struct {
 	EntryCount      uint16   `json:"entryCount"`
 	GlyphIndexArray []uint16 `json:"glyphIndexArray"`
 }
+
+type NGrups struct {
+	StartCharCode uint32 `json:"startCharCode"`
+	EndCharCode uint32 `json:"endCharCode"`
+	StartGlyphCode uint32 `json:"startGlyphCode"`
+}
+type CmapFormat8 struct {
+	Format          uint16   `json:"format"`
+	Reserved 				uint16 		`json:"reserved"`
+	Length          uint16   `json:"length"`
+	Language        uint16   `json:"language"`
+	Is32       			[65536]uint8   `json:"is32"`
+	NGroups      		NGrups   `json:"nGroups"`
+}
+
+type CmapFormat10 struct {
+	Format          uint16   `json:"format"`
+	Reserved 				uint16 		`json:"reserved"`
+	Length          uint32   `json:"length"`
+	Language        uint32   `json:"language"`
+	StartCharCode 	uint32 `json:"startCharCode"`
+	NumChars 				uint32 `json:"numChars"`
+	Glyphs  []uint32  `json:"glyphs"`
+}
+
+type CmapFormat12 struct {
+	Format          uint16   `json:"format"`
+	Reserved 				uint16 		`json:"reserved"`
+	Length          uint32   `json:"length"`
+	Language        uint32   `json:"language"`
+	NGroups      		NGrups   `json:"nGroups"`
+}
+
+type CmapFormat13 struct {
+	StartCharCode uint32 `json:"startCharCode"`
+	EndCharCode uint32 `json:"endCharCode"`
+	GlyphCode uint32 `json:"glyphCode"`
+}
+
+type CmapFormat14 struct {
+	Format          uint16   `json:"format"`
+	Length          uint32   `json:"length"`
+	NumVarSelectorRecords uint32 `json:"numVarSelectorRecords"`
+}
