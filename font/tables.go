@@ -1,5 +1,7 @@
 package font
 
+import "errors"
+
 type OffsetTable struct {
 	ScalerType    uint32 `json:"scalerType"`
 	NumTables     uint16 `json:"numTables"`
@@ -415,7 +417,7 @@ func GetLoca(data []byte, numGlyphs uint16, indexToLocFormat int16) []uint16 {
 type Cmap struct {
 	Version         uint16 `json:"version"`
 	NumberSubtables uint16 `json:"numberSubtables"`
-	Format          uint16 `json:"format"`
+	SubTables []map[string]interface{} `json:"subTables"`
 }
 
 type CmapChild struct {
@@ -507,4 +509,106 @@ type CmapFormat14 struct {
 	Format          uint16   `json:"format"`
 	Length          uint32   `json:"length"`
 	NumVarSelectorRecords uint32 `json:"numVarSelectorRecords"`
+}
+
+type CmapFormat2SubHeader struct {
+	FirstCode uint16 `json:"firstCode"`
+	EntryCount uint16 `json:"entryCount"`
+	IdDelta int16 `json:"idDelta"`
+	IdRangeOffset uint16 `json:"idRangeOffset"`
+}
+
+func GetCmap(data []byte) (cmap *Cmap,err error) {
+	pos := 0
+	cmap = new(Cmap)
+	cmap.Version = getUint16(data[0:pos+2])
+	pos += 2
+	cmap.NumberSubtables = getUint16(data[pos:pos+2])
+	pos += 2
+
+	for i := 0; i < int(cmap.NumberSubtables); i++ {
+		subTable := make(map[string] interface{})
+		subTable["platformID"] = getUint16(data[pos:pos+2])
+		pos += 2
+		subTable["platformSpecificID"] = getUint16(data[pos:pos+2])
+		pos+=2
+		subTable["offset"] = getUint32(data[pos:pos+4])
+		pos+=4
+
+		startPos := pos
+
+		subTable["format"] = getUint16(data[pos:pos+2])
+		pos+=2
+		format, ok := subTable["format"].(int)
+		if !ok {
+			err = errors.New("cmap format int error")
+			return
+		}
+		if format == 0 {
+			subTable["length"] = getUint16(data[pos:pos+2])
+			pos+=2
+			subTable["language"] = getUint16(data[pos:pos+2])
+			pos+=2
+
+			len, ok := subTable["length"].(int)
+			if !ok {
+				err = errors.New("cmap format0 length error")
+				return
+			}
+			var glyphIndexArray []uint8
+			for i := 0; i < len; i++ {
+				glyphIndexArray = append(glyphIndexArray, getUint8(data[pos:pos+1]))
+				pos++
+			}
+			subTable["glyphIndexArray"] = glyphIndexArray
+			
+		} else if format == 2 {
+			subTable["length"] = getUint16(data[pos:pos+2])
+			pos+=2
+			subTable["language"] = getUint16(data[pos:pos+2])
+			pos+=2
+
+			var subHeaderKeys []uint16
+			maxSubHeaderKey := 0
+			for i := 0; i < 256; i++ {
+				sourceVal := getUint16(data[pos:pos+2])
+				subHeaderKeys = append(subHeaderKeys, sourceVal)
+				pos+=2
+				val := int(sourceVal)/8
+
+				if (val > maxSubHeaderKey) {
+					maxSubHeaderKey = val
+				}
+			}
+			subTable["subHeaderKeys"] = subHeaderKeys
+
+			var subHeaders []*CmapFormat2SubHeader
+			for k := 0; k < maxSubHeaderKey; k++ {
+				subHeaders = append(subHeaders, &CmapFormat2SubHeader{
+					getUint16(data[pos:pos+2]),
+					getUint16(data[pos+2:pos+4]),
+					getInt16(data[pos+4:pos+6]),
+					getUint16(data[pos+6:pos+8]),
+				})
+				pos+=8
+			}
+			subTable["subHeaders"] = subHeaders
+			subTableLen, ok := subTable["length"].(int)
+			if !ok {
+				return
+			}
+
+			glyphIndexArrayLen := (startPos + subTableLen - pos)/2
+			var glyphIndexArray []uint16
+			for i := 0; i < glyphIndexArrayLen; i++ {
+				glyphIndexArray = append(glyphIndexArray, getUint16(data[pos:pos+2]))
+				pos += 2
+			}
+			subTable["glyphIndexArray"] = glyphIndexArray
+
+		}
+
+	}
+
+	return
 }
