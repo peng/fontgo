@@ -55,9 +55,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	directory.TableContent = tableContent
 	directory.Tables = tables
 	glyfStart := tableContent["glyf"].Offset
-	// glyfEnd := glyfStart + tableContent["glyf"].Length
 	directory.Glyphs = GetGlyphs(fileByte[glyfStart:], tables.Loca)
-
-	// directory = &Directory{offsetTable, tableContent, tables}
+	
 	return
 }

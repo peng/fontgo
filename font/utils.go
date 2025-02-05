@@ -2,6 +2,7 @@ package font
 
 import (
 	"encoding/binary"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -12,6 +13,19 @@ func getUint8(data []byte) uint8 {
 
 func getUint16(data []byte) uint16 {
 	return binary.BigEndian.Uint16(data)
+}
+
+func getUint24(data []byte) (num uint32, err error) {
+	if len(data) < 3 {
+		err = errors.New("data to short to read uint24")
+		return
+	}
+
+	num |= uint32(data[0]) << 16
+	num |= uint32(data[1]) << 8
+	num |= uint32(data[2])
+
+	return
 }
 
 func getUint32(data []byte) uint32 {

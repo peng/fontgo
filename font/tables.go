@@ -524,6 +524,18 @@ type CmapFormat8nGroup struct {
 	StartGlyphCode uint32 `json:"startGlyphCode"`
 }
 
+type CmapFormatDefaultUVS struct {
+	StartUnicode int `json:"startUnicode"`
+	EndUnicode int `json:"endUnicode"`
+	VarSelector uint32 `json:"varSelector"`
+}
+
+type CmapFormatNonDefaultUVS struct {
+	UnicodeValue int `json:"unicodeValue"`
+	GlyphID uint16 `json:"glyphId"`
+	VarSelector uint32 `json:"varSelector"`
+}
+
 func GetCmap(data []byte) (cmap *Cmap,err error) {
 	pos := 0
 	cmap = new(Cmap)
@@ -731,7 +743,7 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 				pos+=2
 			}
 			subTable["glyphs"] = glyphs
-		} else if format == 12 {
+		} else if format == 12 || format == 13 {
 			subTable["reserved"] = getUint16(data[pos:pos+2])
 			pos+=2
 			subTable["length"] = getUint32(data[pos:pos+4])
@@ -753,6 +765,70 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 			}
 			subTable["groups"] = groups
 
+		} else if format == 14 {
+			subTable["length"] = getUint32(data[pos:pos+4])
+			pos+=4
+			subTable["numVarSelectorRecords"] = getUint32(data[pos:pos+4])
+			pos+=4
+
+			n := subTable["numVarSelectorRecords"].(int)
+			var groups []interface{}
+			for i := 0; i < n; i++ {
+				var varSelector uint32
+				varSelector, err = getUint24(data[pos:pos+3])
+				pos+=3
+				if err != nil {
+					return
+				}
+				defaultUVSOffset := int(getUint32(data[pos:pos+4]))
+				pos+=4
+				nonDefaultUVSOffset := int(getUint32(data[pos:pos+4]))
+				pos+=4
+
+				if defaultUVSOffset != 0 {
+					numUnicodeValueRanges := int(getUint32(data[pos+defaultUVSOffset:pos+defaultUVSOffset+4]))
+
+					for i := 0; i < numUnicodeValueRanges; i++ {
+						var startUnicode uint32
+						startUnicode, err = getUint24(data[pos:pos+3])
+						pos+=3
+						if err != nil {
+							return
+						}
+						start := int(startUnicode)
+						additionalCount := int(getUint8(data[pos:pos+1]))
+						pos++
+						end := start+additionalCount
+						groups = append(groups, &CmapFormatDefaultUVS{
+							start,
+							end,
+							varSelector, 
+						})
+					}
+				}
+
+				if nonDefaultUVSOffset != 0 {
+					numUVSMappings := int(getUint32(data[startPos+nonDefaultUVSOffset:startPos+nonDefaultUVSOffset+4]))
+
+					for i := 0; i < numUVSMappings; i++ {
+						var v uint32
+						v, err = getUint24(data[pos:pos+3])
+						pos+=3
+						if err != nil {
+							return
+						}
+						groups = append(groups, &CmapFormatNonDefaultUVS{
+							int(v),
+							getUint16(data[pos:pos+4]),
+							varSelector,
+						})
+					}
+				}
+
+
+			}
+
+			subTable["groups"] = groups
 		}
 
 	}
