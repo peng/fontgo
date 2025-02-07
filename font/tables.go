@@ -708,6 +708,7 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 				is32 = append(is32, getUint8(data[pos:pos+1]))
 				pos++
 			}
+			subTable["is32"] = is32
 
 			// n := (subTable["length"].(int) - (pos - startPos))/12
 			subTable["nGroups"] = getUint32(data[pos:pos+4])
@@ -829,8 +830,11 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 			}
 
 			subTable["groups"] = groups
+		} else {
+			err = errors.New("format not support!")
+			return
 		}
-
+		cmap.SubTables = append(cmap.SubTables, subTable)
 	}
 
 	return
