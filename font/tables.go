@@ -837,5 +837,14 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 		cmap.SubTables = append(cmap.SubTables, subTable)
 	}
 
+	// Read Windows support
+	var subTables map[string]interface{}
+	subTables, err = readWindowsCode(cmap.SubTables)
+	
+
 	return
+}
+
+func readWindowsCode(subTables []map[string]interface{}) (code map[string]interface{}, err error) {
+
 }
