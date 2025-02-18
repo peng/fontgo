@@ -546,7 +546,7 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 
 	for i := 0; i < int(cmap.NumberSubtables); i++ {
 		subTable := make(map[string] interface{})
-		subTable["platformID"] = getUint16(data[pos:pos+2])
+		subTable["platformID"] = int(getUint16(data[pos:pos+2]))
 		pos += 2
 		subTable["platformSpecificID"] = getUint16(data[pos:pos+2])
 		pos+=2
@@ -555,7 +555,7 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 
 		startPos := pos
 
-		subTable["format"] = getUint16(data[pos:pos+2])
+		subTable["format"] = int(getUint16(data[pos:pos+2]))
 		pos+=2
 		format, ok := subTable["format"].(int)
 		if !ok {
@@ -846,5 +846,20 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 }
 
 func readWindowsCode(subTables []map[string]interface{}) (code map[string]interface{}, err error) {
+	var format0, format2, format4, format12, format14 bool
 
+	for _, val := range subTables {
+		formatSource, exist := val["format"]
+		platformIDSource, exist2 := val["platformID"]
+		platformSpecificIDSource, exist3 := val["platformSpecificID"]
+
+		if !exist || !exist2 || exist3 {
+			return
+		}
+		format := formatSource.(int)
+
+		if format == 0 {
+			format0 = true
+		}
+	}
 }
