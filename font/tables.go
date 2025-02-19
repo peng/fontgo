@@ -845,8 +845,8 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 	return
 }
 
-func readWindowsCode(subTables []map[string]interface{}) (code map[string]interface{}, err error) {
-	var format0, format2, format4, format12, format14 bool
+func readWindowsCode(subTables []map[string]interface{}) (code map[int]interface{}, err error) {
+	var format0, format2, format4, format12, format14 map[string]interface{}
 
 	for _, val := range subTables {
 		formatSource, exist := val["format"]
@@ -857,9 +857,33 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[string]interf
 			return
 		}
 		format := formatSource.(int)
-
+		platformID := platformIDSource.(int)
+		platformSpecificID := platformSpecificIDSource.(int)
+		// https://learn.microsoft.com/en-us/typography/opentype/spec/recom#cmap-table
 		if format == 0 {
-			format0 = true
+			format0 = val
+		} else if format == 2 && platformID == 3 && platformSpecificID == 3 {
+			format2 = val
+		} else if format == 4 && platformID == 3 && platformSpecificID == 1 {
+			format4 = val
+		} else if format == 12 && platformID == 3 && platformSpecificID == 10 {
+			format12 = val
+		} else if format == 14 && platformID == 0 && platformSpecificID == 5 {
+			format14 = val
 		}
+	}
+
+	if len(format0) > 0 {
+		g, exist := format0["glyphIndexArray"]
+		if exist {
+			glyphIndexArray := g.([]uint8)
+			for ind, val := range glyphIndexArray {
+				if int(val) != 0 {
+					code[ind] = val
+				}
+			}
+		}
+		
+		
 	}
 }
