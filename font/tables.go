@@ -415,9 +415,10 @@ func GetLoca(data []byte, numGlyphs uint16, indexToLocFormat int16) []uint16 {
 }
 
 type Cmap struct {
-	Version         uint16 `json:"version"`
-	NumberSubtables uint16 `json:"numberSubtables"`
-	SubTables []map[string]interface{} `json:"subTables"`
+	Version         uint16                   `json:"version"`
+	NumberSubtables uint16                   `json:"numberSubtables"`
+	SubTables       []map[string]interface{} `json:"subTables"`
+	WindowsCode     map[int]int
 }
 
 type CmapChild struct {
@@ -468,105 +469,105 @@ type CmapFormat6 struct {
 }
 
 type NGrups struct {
-	StartCharCode uint32 `json:"startCharCode"`
-	EndCharCode uint32 `json:"endCharCode"`
+	StartCharCode  uint32 `json:"startCharCode"`
+	EndCharCode    uint32 `json:"endCharCode"`
 	StartGlyphCode uint32 `json:"startGlyphCode"`
 }
 type CmapFormat8 struct {
-	Format          uint16   `json:"format"`
-	Reserved 				uint16 		`json:"reserved"`
-	Length          uint16   `json:"length"`
-	Language        uint16   `json:"language"`
-	Is32       			[65536]uint8   `json:"is32"`
-	NGroups      		NGrups   `json:"nGroups"`
+	Format   uint16       `json:"format"`
+	Reserved uint16       `json:"reserved"`
+	Length   uint16       `json:"length"`
+	Language uint16       `json:"language"`
+	Is32     [65536]uint8 `json:"is32"`
+	NGroups  NGrups       `json:"nGroups"`
 }
 
 type CmapFormat10 struct {
-	Format          uint16   `json:"format"`
-	Reserved 				uint16 		`json:"reserved"`
-	Length          uint32   `json:"length"`
-	Language        uint32   `json:"language"`
-	StartCharCode 	uint32 `json:"startCharCode"`
-	NumChars 				uint32 `json:"numChars"`
-	Glyphs  []uint32  `json:"glyphs"`
+	Format        uint16   `json:"format"`
+	Reserved      uint16   `json:"reserved"`
+	Length        uint32   `json:"length"`
+	Language      uint32   `json:"language"`
+	StartCharCode uint32   `json:"startCharCode"`
+	NumChars      uint32   `json:"numChars"`
+	Glyphs        []uint32 `json:"glyphs"`
 }
 
 type CmapFormat12 struct {
-	Format          uint16   `json:"format"`
-	Reserved 				uint16 		`json:"reserved"`
-	Length          uint32   `json:"length"`
-	Language        uint32   `json:"language"`
-	NGroups      		NGrups   `json:"nGroups"`
+	Format   uint16 `json:"format"`
+	Reserved uint16 `json:"reserved"`
+	Length   uint32 `json:"length"`
+	Language uint32 `json:"language"`
+	NGroups  NGrups `json:"nGroups"`
 }
 
 type CmapFormat13 struct {
 	StartCharCode uint32 `json:"startCharCode"`
-	EndCharCode uint32 `json:"endCharCode"`
-	GlyphCode uint32 `json:"glyphCode"`
+	EndCharCode   uint32 `json:"endCharCode"`
+	GlyphCode     uint32 `json:"glyphCode"`
 }
 
 type CmapFormat14 struct {
-	Format          uint16   `json:"format"`
-	Length          uint32   `json:"length"`
+	Format                uint16 `json:"format"`
+	Length                uint32 `json:"length"`
 	NumVarSelectorRecords uint32 `json:"numVarSelectorRecords"`
 }
 
 type CmapFormat2SubHeader struct {
-	FirstCode uint16 `json:"firstCode"`
-	EntryCount uint16 `json:"entryCount"`
-	IdDelta int16 `json:"idDelta"`
+	FirstCode     uint16 `json:"firstCode"`
+	EntryCount    uint16 `json:"entryCount"`
+	IdDelta       int16  `json:"idDelta"`
 	IdRangeOffset uint16 `json:"idRangeOffset"`
 }
 
 type CmapFormat8nGroup struct {
-	StartCharCode uint32 `json:"startCharCode"`
-	EndCharCode uint32 `json:"endCharCode"`
+	StartCharCode  uint32 `json:"startCharCode"`
+	EndCharCode    uint32 `json:"endCharCode"`
 	StartGlyphCode uint32 `json:"startGlyphCode"`
 }
 
 type CmapFormatDefaultUVS struct {
-	StartUnicode int `json:"startUnicode"`
-	EndUnicode int `json:"endUnicode"`
-	VarSelector uint32 `json:"varSelector"`
+	StartUnicode int    `json:"startUnicode"`
+	EndUnicode   int    `json:"endUnicode"`
+	VarSelector  uint32 `json:"varSelector"`
 }
 
 type CmapFormatNonDefaultUVS struct {
-	UnicodeValue int `json:"unicodeValue"`
-	GlyphID uint16 `json:"glyphId"`
-	VarSelector uint32 `json:"varSelector"`
+	UnicodeValue int    `json:"unicodeValue"`
+	GlyphID      uint16 `json:"glyphId"`
+	VarSelector  uint32 `json:"varSelector"`
 }
 
-func GetCmap(data []byte) (cmap *Cmap,err error) {
+func GetCmap(data []byte) (cmap *Cmap, err error) {
 	pos := 0
 	cmap = new(Cmap)
-	cmap.Version = getUint16(data[0:pos+2])
+	cmap.Version = getUint16(data[0 : pos+2])
 	pos += 2
-	cmap.NumberSubtables = getUint16(data[pos:pos+2])
+	cmap.NumberSubtables = getUint16(data[pos : pos+2])
 	pos += 2
 
 	for i := 0; i < int(cmap.NumberSubtables); i++ {
-		subTable := make(map[string] interface{})
-		subTable["platformID"] = int(getUint16(data[pos:pos+2]))
+		subTable := make(map[string]interface{})
+		subTable["platformID"] = int(getUint16(data[pos : pos+2]))
 		pos += 2
-		subTable["platformSpecificID"] = getUint16(data[pos:pos+2])
-		pos+=2
-		subTable["offset"] = getUint32(data[pos:pos+4])
-		pos+=4
+		subTable["platformSpecificID"] = getUint16(data[pos : pos+2])
+		pos += 2
+		subTable["offset"] = getUint32(data[pos : pos+4])
+		pos += 4
 
 		startPos := pos
 
-		subTable["format"] = int(getUint16(data[pos:pos+2]))
-		pos+=2
+		subTable["format"] = int(getUint16(data[pos : pos+2]))
+		pos += 2
 		format, ok := subTable["format"].(int)
 		if !ok {
 			err = errors.New("cmap format int error")
 			return
 		}
 		if format == 0 {
-			subTable["length"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["language"] = getUint16(data[pos:pos+2])
-			pos+=2
+			subTable["length"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["language"] = getUint16(data[pos : pos+2])
+			pos += 2
 
 			len, ok := subTable["length"].(int)
 			if !ok {
@@ -579,22 +580,22 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 				pos++
 			}
 			subTable["glyphIndexArray"] = glyphIndexArray
-			
+
 		} else if format == 2 {
-			subTable["length"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["language"] = getUint16(data[pos:pos+2])
-			pos+=2
+			subTable["length"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["language"] = getUint16(data[pos : pos+2])
+			pos += 2
 
 			var subHeaderKeys []uint16
 			maxSubHeaderKey := 0
 			for i := 0; i < 256; i++ {
-				sourceVal := getUint16(data[pos:pos+2])
+				sourceVal := getUint16(data[pos : pos+2])
 				subHeaderKeys = append(subHeaderKeys, sourceVal)
-				pos+=2
-				val := int(sourceVal)/8
+				pos += 2
+				val := int(sourceVal) / 8
 
-				if (val > maxSubHeaderKey) {
+				if val > maxSubHeaderKey {
 					maxSubHeaderKey = val
 				}
 			}
@@ -603,12 +604,12 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 			var subHeaders []*CmapFormat2SubHeader
 			for k := 0; k < maxSubHeaderKey; k++ {
 				subHeaders = append(subHeaders, &CmapFormat2SubHeader{
-					getUint16(data[pos:pos+2]),
-					getUint16(data[pos+2:pos+4]),
-					getInt16(data[pos+4:pos+6]),
-					getUint16(data[pos+6:pos+8]),
+					getUint16(data[pos : pos+2]),
+					getUint16(data[pos+2 : pos+4]),
+					getInt16(data[pos+4 : pos+6]),
+					getUint16(data[pos+6 : pos+8]),
 				})
-				pos+=8
+				pos += 8
 			}
 			subTable["subHeaders"] = subHeaders
 			subTableLen, ok := subTable["length"].(int)
@@ -616,7 +617,7 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 				return
 			}
 
-			glyphIndexArrayLen := (startPos + subTableLen - pos)/2
+			glyphIndexArrayLen := (startPos + subTableLen - pos) / 2
 			var glyphIndexArray []uint16
 			for i := 0; i < glyphIndexArrayLen; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint16(data[pos:pos+2]))
@@ -625,84 +626,84 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 			subTable["glyphIndexArray"] = glyphIndexArray
 
 		} else if format == 4 {
-			subTable["length"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["language"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["segCountX2"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["searchRange"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["entrySelector"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["rangeShift"] = getUint16(data[pos:pos+2])
-			pos+=2
+			subTable["length"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["language"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["segCountX2"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["searchRange"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["entrySelector"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["rangeShift"] = getUint16(data[pos : pos+2])
+			pos += 2
 
 			segCount := subTable["segCountX2"].(int) / 2
 
 			var endCode []uint16
 			for i := 0; i < segCount; i++ {
 				endCode = append(endCode, getUint16(data[pos:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["endCode"] = endCode
-			subTable["reservedPad"] = getUint16(data[pos:pos+2])
-			pos+=2
+			subTable["reservedPad"] = getUint16(data[pos : pos+2])
+			pos += 2
 
 			var startCode []uint16
 			for i := 0; i < segCount; i++ {
 				startCode = append(startCode, getUint16(data[0:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["startCode"] = startCode
 
 			var idDelta []uint16
 			for i := 0; i < segCount; i++ {
 				idDelta = append(idDelta, getUint16(data[0:2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["idDelta"] = idDelta
 
 			var idRangeOffset []uint16
 			for i := 0; i < segCount; i++ {
 				idRangeOffset = append(idRangeOffset, getUint16(data[pos:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["idRangeOffset"] = idRangeOffset
 
 			// The remaining is glyphIndexArray length
-			glyphLen := (subTable["length"].(int) - (pos - startPos))/2
+			glyphLen := (subTable["length"].(int) - (pos - startPos)) / 2
 			var glyphIndexArray []uint16
 			for i := 0; i < glyphLen; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint16(data[pos:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["glyphIndexArray"] = glyphIndexArray
 
 		} else if format == 6 {
-			subTable["length"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["language"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["firstCode"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["entryCount"] = getUint16(data[pos:pos+2])
-			pos+=2
+			subTable["length"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["language"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["firstCode"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["entryCount"] = getUint16(data[pos : pos+2])
+			pos += 2
 
 			var glyphIndexArray []uint16
 			entryCount := subTable["entryCount"].(int)
 			for i := 0; i < entryCount; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint16(data[pos:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["glyphIndexArray"] = glyphIndexArray
 		} else if format == 8 {
-			subTable["reserved"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["length"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["language"] = getUint32(data[pos:pos+4])
-			pos+=4
+			subTable["reserved"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["length"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["language"] = getUint32(data[pos : pos+4])
+			pos += 4
 			var is32 []uint8
 			for i := 0; i < 65536; i++ {
 				is32 = append(is32, getUint8(data[pos:pos+1]))
@@ -711,121 +712,126 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 			subTable["is32"] = is32
 
 			// n := (subTable["length"].(int) - (pos - startPos))/12
-			subTable["nGroups"] = getUint32(data[pos:pos+4])
-			pos+=4
+			subTable["nGroups"] = getUint32(data[pos : pos+4])
+			pos += 4
 			n := subTable["nGroups"].(int)
 			var groups []*CmapFormat8nGroup
 			for i := 0; i < n; i++ {
 				groups = append(groups, &CmapFormat8nGroup{
-					getUint32(data[pos:pos+4]),
-					getUint32(data[pos+4:pos+8]),
-					getUint32(data[pos+8:pos+12]),
+					getUint32(data[pos : pos+4]),
+					getUint32(data[pos+4 : pos+8]),
+					getUint32(data[pos+8 : pos+12]),
 				})
-				pos+=12
+				pos += 12
 			}
 			subTable["groups"] = groups
 
 		} else if format == 10 {
-			subTable["reserved"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["length"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["language"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["startCharCode"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["numChars"] = getUint32(data[pos:pos+4])
-			pos+=4
+			subTable["reserved"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["length"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["language"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["startCharCode"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["numChars"] = getUint32(data[pos : pos+4])
+			pos += 4
 			numChars := subTable["numChars"].(int)
 
 			var glyphs []uint16
 			for i := 0; i < numChars; i++ {
 				glyphs = append(glyphs, getUint16(data[pos:pos+2]))
-				pos+=2
+				pos += 2
 			}
 			subTable["glyphs"] = glyphs
 		} else if format == 12 || format == 13 {
-			subTable["reserved"] = getUint16(data[pos:pos+2])
-			pos+=2
-			subTable["length"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["language"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["nGroups"] = getUint32(data[pos:pos+4])
-			pos+=4
+			subTable["reserved"] = getUint16(data[pos : pos+2])
+			pos += 2
+			subTable["length"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["language"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["nGroups"] = getUint32(data[pos : pos+4])
+			pos += 4
 
 			n := subTable["nGroups"].(int)
 			var groups []*CmapFormat8nGroup
 			for i := 0; i < n; i++ {
 				groups = append(groups, &CmapFormat8nGroup{
-					getUint32(data[pos:pos+4]),
-					getUint32(data[pos+4:pos+8]),
-					getUint32(data[pos+8:pos+12]),
+					getUint32(data[pos : pos+4]),
+					getUint32(data[pos+4 : pos+8]),
+					getUint32(data[pos+8 : pos+12]),
 				})
-				pos+=12
+				pos += 12
 			}
 			subTable["groups"] = groups
 
 		} else if format == 14 {
-			subTable["length"] = getUint32(data[pos:pos+4])
-			pos+=4
-			subTable["numVarSelectorRecords"] = getUint32(data[pos:pos+4])
-			pos+=4
+			subTable["length"] = getUint32(data[pos : pos+4])
+			pos += 4
+			subTable["numVarSelectorRecords"] = getUint32(data[pos : pos+4])
+			pos += 4
 
 			n := subTable["numVarSelectorRecords"].(int)
 			var groups []interface{}
 			for i := 0; i < n; i++ {
 				var varSelector uint32
-				varSelector, err = getUint24(data[pos:pos+3])
-				pos+=3
+				varSelector, err = getUint24(data[pos : pos+3])
+				pos += 3
 				if err != nil {
 					return
 				}
-				defaultUVSOffset := int(getUint32(data[pos:pos+4]))
-				pos+=4
-				nonDefaultUVSOffset := int(getUint32(data[pos:pos+4]))
-				pos+=4
+				defaultUVSOffset := int(getUint32(data[pos : pos+4]))
+				pos += 4
+				nonDefaultUVSOffset := int(getUint32(data[pos : pos+4]))
+				pos += 4
 
 				if defaultUVSOffset != 0 {
-					numUnicodeValueRanges := int(getUint32(data[pos+defaultUVSOffset:pos+defaultUVSOffset+4]))
+					numUnicodeValueRanges := int(getUint32(data[pos+defaultUVSOffset : pos+defaultUVSOffset+4]))
 
 					for i := 0; i < numUnicodeValueRanges; i++ {
 						var startUnicode uint32
-						startUnicode, err = getUint24(data[pos:pos+3])
-						pos+=3
+						startUnicode, err = getUint24(data[pos : pos+3])
+						pos += 3
 						if err != nil {
 							return
 						}
 						start := int(startUnicode)
-						additionalCount := int(getUint8(data[pos:pos+1]))
+						additionalCount := int(getUint8(data[pos : pos+1]))
 						pos++
-						end := start+additionalCount
-						groups = append(groups, &CmapFormatDefaultUVS{
+						end := start + additionalCount
+						var res []interface{}
+						res = append(res, 0)
+						res = append(res, &CmapFormatDefaultUVS{
 							start,
 							end,
-							varSelector, 
+							varSelector,
 						})
+						groups = append(groups, res)
 					}
 				}
 
 				if nonDefaultUVSOffset != 0 {
-					numUVSMappings := int(getUint32(data[startPos+nonDefaultUVSOffset:startPos+nonDefaultUVSOffset+4]))
+					numUVSMappings := int(getUint32(data[startPos+nonDefaultUVSOffset : startPos+nonDefaultUVSOffset+4]))
 
 					for i := 0; i < numUVSMappings; i++ {
 						var v uint32
-						v, err = getUint24(data[pos:pos+3])
-						pos+=3
+						v, err = getUint24(data[pos : pos+3])
+						pos += 3
 						if err != nil {
 							return
 						}
-						groups = append(groups, &CmapFormatNonDefaultUVS{
+						var res []interface{}
+						res = append(res, 1)
+						res = append(res, &CmapFormatNonDefaultUVS{
 							int(v),
-							getUint16(data[pos:pos+4]),
+							getUint16(data[pos : pos+4]),
 							varSelector,
 						})
+						groups = append(groups, res)
 					}
 				}
-
 
 			}
 
@@ -838,14 +844,12 @@ func GetCmap(data []byte) (cmap *Cmap,err error) {
 	}
 
 	// Read Windows support
-	var subTables map[string]interface{}
-	subTables, err = readWindowsCode(cmap.SubTables)
-	
+	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables)
 
 	return
 }
 
-func readWindowsCode(subTables []map[string]interface{}) (code map[int]interface{}, err error) {
+func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err error) {
 	var format0, format2, format4, format12, format14 map[string]interface{}
 
 	for _, val := range subTables {
@@ -879,11 +883,26 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]interface
 			glyphIndexArray := g.([]uint8)
 			for ind, val := range glyphIndexArray {
 				if int(val) != 0 {
-					code[ind] = val
+					code[ind] = int(val)
 				}
 			}
 		}
-		
-		
 	}
+
+	if len(format14) > 0 {
+		groupsSource, exist := format14["groups"]
+		if exist {
+			groups := groupsSource.([]interface{})
+			for _, sVal := range groups {
+				val := sVal.([]interface{})
+				typeVal := val[0].(int)
+				if typeVal == 1 {
+					nonDefaultUVS := val[1].(CmapFormatNonDefaultUVS)
+					code[nonDefaultUVS.UnicodeValue] = int(nonDefaultUVS.GlyphID)
+				}
+			}
+		}
+	}
+
+	return
 }
