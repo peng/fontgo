@@ -904,5 +904,28 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 		}
 	}
 
+	if len(format12) > 0 {
+		gSource, exist := format12["nGroups"]
+		if !exist {
+			return
+		}
+		groups := gSource.([]*CmapFormat8nGroup)
+		for _, val := range groups {
+			startCharCode := int(val.StartCharCode)
+			endCharCode := int(val.EndCharCode)
+			startGlyphCode := int(val.StartGlyphCode)
+
+			for startCharCode <= endCharCode {
+				code[startCharCode] = startGlyphCode
+				startCharCode++
+				startGlyphCode++
+			}
+		}
+	} else if len(format4) > 0 {
+
+	} else if len(format2) > 0 {
+
+	}
+
 	return
 }
