@@ -537,7 +537,7 @@ type CmapFormatNonDefaultUVS struct {
 	VarSelector  uint32 `json:"varSelector"`
 }
 
-func GetCmap(data []byte) (cmap *Cmap, err error) {
+func GetCmap(data []byte, prevPos int) (cmap *Cmap, err error) {
 	pos := 0
 	cmap = new(Cmap)
 	cmap.Version = getUint16(data[0 : pos+2])
@@ -670,6 +670,8 @@ func GetCmap(data []byte) (cmap *Cmap, err error) {
 				pos += 2
 			}
 			subTable["idRangeOffset"] = idRangeOffset
+
+			subTable["glyphIndexArrayOffset"] = pos + prevPos
 
 			// The remaining is glyphIndexArray length
 			glyphLen := (subTable["length"].(int) - (pos - startPos)) / 2
@@ -922,7 +924,46 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 			}
 		}
 	} else if len(format4) > 0 {
+		segCountX2, exist1 := format4["segCountX2"]
+		startCodeSource, exist2 := format4["startCode"]
+		endCodeSource, exist3 := format4["endCode"]
+		idRangeOffsetSource, exist4 := format4["idRangeOffset"]
+		glyphIndexArrayOffsetSource, exist5 := format4["glyphIndexArrayOffset"]
+		idDeltaSource, exist6 := format4["idDelta"]
+		glyphIndexArraySource, exist7 := format4["glyphIndexArray"]
 
+		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 {
+			return
+		}
+
+		segCount := segCountX2.(int) / 2
+		startCode := startCodeSource.([]uint16)
+		endCode := endCodeSource.([]uint16)
+		idRangeOffset := idRangeOffsetSource.([]uint16)
+		glyphIndexArrayOffset := glyphIndexArrayOffsetSource.(int)
+		idDelta := idDeltaSource.([]uint16)
+		glyphIndexArray := glyphIndexArraySource.([]uint16)
+
+		for i := 0; i < segCount; i++ {
+			for start, end := int(startCode[i]), int(endCode[i]); start <= end; start++ {
+				if int(idRangeOffset[i]) == 0 {
+					code[start] = (start + int(idDelta[i])) % 0x10000
+				} else {
+					index := i + int(idRangeOffset[i])/2 + (start - int(startCode[i])) - glyphIndexArrayOffset
+
+					glyphIndex := int(glyphIndexArray[index])
+
+					if glyphIndex != 0 {
+						code[start] = (glyphIndex + int(idDelta[i])) % 0x10000
+					} else {
+						code[start] = 0
+					}
+				}
+			}
+		}
+
+		// wip 65535
+		delete(code, 65535)
 	} else if len(format2) > 0 {
 
 	}
