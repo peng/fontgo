@@ -1,6 +1,8 @@
 package font
 
-import "errors"
+import (
+	"errors"
+)
 
 type OffsetTable struct {
 	ScalerType    uint32 `json:"scalerType"`
@@ -537,7 +539,7 @@ type CmapFormatNonDefaultUVS struct {
 	VarSelector  uint32 `json:"varSelector"`
 }
 
-func GetCmap(data []byte, prevPos int) (cmap *Cmap, err error) {
+func GetCmap(data []byte, prevPos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 	pos := 0
 	cmap = new(Cmap)
 	cmap.Version = getUint16(data[0 : pos+2])
@@ -589,6 +591,7 @@ func GetCmap(data []byte, prevPos int) (cmap *Cmap, err error) {
 
 			var subHeaderKeys []uint16
 			maxSubHeaderKey := 0
+			maxPos := -1
 			for i := 0; i < 256; i++ {
 				sourceVal := getUint16(data[pos : pos+2])
 				subHeaderKeys = append(subHeaderKeys, sourceVal)
@@ -597,9 +600,11 @@ func GetCmap(data []byte, prevPos int) (cmap *Cmap, err error) {
 
 				if val > maxSubHeaderKey {
 					maxSubHeaderKey = val
+					maxPos = i
 				}
 			}
 			subTable["subHeaderKeys"] = subHeaderKeys
+			subTable["maxPos"] = maxPos
 
 			var subHeaders []*CmapFormat2SubHeader
 			for k := 0; k < maxSubHeaderKey; k++ {
@@ -846,12 +851,12 @@ func GetCmap(data []byte, prevPos int) (cmap *Cmap, err error) {
 	}
 
 	// Read Windows support
-	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables)
+	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
 
 	return
 }
 
-func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err error) {
+func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (code map[int]int, err error) {
 	var format0, format2, format4, format12, format14 map[string]interface{}
 
 	for _, val := range subTables {
@@ -860,6 +865,7 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 		platformSpecificIDSource, exist3 := val["platformSpecificID"]
 
 		if !exist || !exist2 || exist3 {
+			err = errors.New("Read platformID or platformSpecificID error")
 			return
 		}
 		format := formatSource.(int)
@@ -909,6 +915,7 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 	if len(format12) > 0 {
 		gSource, exist := format12["nGroups"]
 		if !exist {
+			err = errors.New("Read format12 nGroups error")
 			return
 		}
 		groups := gSource.([]*CmapFormat8nGroup)
@@ -933,6 +940,7 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 		glyphIndexArraySource, exist7 := format4["glyphIndexArray"]
 
 		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 {
+			err = errors.New("Read format4 map error")
 			return
 		}
 
@@ -965,7 +973,61 @@ func readWindowsCode(subTables []map[string]interface{}) (code map[int]int, err 
 		// wip 65535
 		delete(code, 65535)
 	} else if len(format2) > 0 {
+		subHeaderKeysS, exist1 := format2["subHeaderKeys"]
+		subHeadersS, exist2 := format2["subHeaders"]
+		glyphIndexArrayS, exist3 := format2["glyphIndexArray"]
+		maxPosS, exist4 := format2["maxPos"]
 
+		if !exist1 || !exist2 || !exist3 || !exist4 {
+			err = errors.New("Read format2 error")
+			return
+		}
+
+		subHeaderKeys := subHeaderKeysS.([]uint16)
+		subHeaders := subHeadersS.([]*CmapFormat2SubHeader)
+		glyphIndexArray := glyphIndexArrayS.([]uint16)
+		maxPos := maxPosS.(int)
+
+		index := 0
+
+		for i := 0; i < 256; i++ {
+			k := int(subHeaderKeys[i]) 
+			if k == 0 {
+
+				if i >= maxPos || i < int(subHeaders[0].FirstCode) || i >= int(subHeaders[0].FirstCode + subHeaders[0].EntryCount) || int(subHeaders[0].IdRangeOffset) + (i - int(subHeaders[0].FirstCode)) >= len(glyphIndexArray) {
+					index = 0
+				} else {
+					index = int(glyphIndexArray[int(subHeaders[0].IdRangeOffset) + (i - int(subHeaders[0].FirstCode))])
+					if index != 0 {
+						index = index + int(subHeaders[0].IdDelta);
+					}
+				} 
+				
+				if index != 0 && index < maxpNumGlyphs {
+					code[i] = index
+				}
+				
+			} else {
+				k := int(subHeaderKeys[i])
+				entryCount := int(subHeaders[k].EntryCount)
+				for j := 0; j < entryCount; j++ {
+
+					if int(subHeaders[k].IdRangeOffset) + j >= len(glyphIndexArray) {
+						index = 0
+					} else {
+						index = int(glyphIndexArray[int(subHeaders[k].IdRangeOffset)+j])
+						if index != 0 {
+							index = index + int(subHeaders[k].IdDelta)
+						}
+					}
+
+					if index != 0 && index < maxpNumGlyphs {
+						unicode := ((i << 8) | (j + int(subHeaders[k].FirstCode))) % 0xffff
+						code[unicode] = index
+					}
+				}
+			}
+		}
 	}
 
 	return
