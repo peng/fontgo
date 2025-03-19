@@ -15,6 +15,7 @@ type Tables struct {
 	Head *Head `json:"head"`
 	Maxp *Maxp `json:"maxp`
 	Loca []uint16 `json:"loca"`
+	Cmap *Cmap `json:"cmap,omitempty"`
 }
 
 type Directory struct {
@@ -42,12 +43,14 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	headInfo := tableContent["head"]
 	maxpInfo := tableContent["maxp"]
 	locaInfo := tableContent["loca"]
+	cmapInfo := tableContent["cmap"]
 
 	// tables content
 	tables := new(Tables)
 	tables.Head = GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
 	tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])
 	tables.Loca = GetLoca(fileByte[locaInfo.Offset:locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
+	tables.Cmap, err = GetCmap(fileByte[cmapInfo.Offset:cmapInfo.Offset+cmapInfo.Length], int(cmapInfo.Offset), int(tables.Maxp.NumGlyphs))
 
 	directory = new(Directory)
 
