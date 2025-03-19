@@ -44,6 +44,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	maxpInfo := tableContent["maxp"]
 	locaInfo := tableContent["loca"]
 	cmapInfo := tableContent["cmap"]
+	// add test
 
 	// tables content
 	tables := new(Tables)
