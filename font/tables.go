@@ -1032,3 +1032,33 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 
 	return
 }
+
+type NameRecord struct {
+	PlatformID uint16 `json:"platformId"`
+	PlatformSpecificID uint16 `json:"platformSpecificId"`
+	LanguageID uint16 `json:"languageId"`
+	NameID	uint16 `json:"nameId"`
+	Length uint16 `json:"length"`
+	Offset uint16 `json:"offset"`
+}
+
+type NameTable struct {
+	Format uint16 `json:"format`
+	Count uint16 `json:"count"`
+	StringOffset uint16 `json:"stringOffset"`
+	NameRecord []*NameRecord `json:"nameRecord"`
+}
+
+func GetName (data []byte) (nameTable *NameTable) {
+	nameTable = new(NameTable)
+	nameTable.Format = getUint16(data[0:2])
+	nameTable.Count = getUint16(data[2:4])
+	nameTable.StringOffset = getUint16(data[4:6])
+	pos := 6
+
+	count := int(nameTable.Count)
+
+	for i := 0; i < count; i++ {
+		
+	}
+}
