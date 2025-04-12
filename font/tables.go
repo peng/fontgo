@@ -1746,6 +1746,7 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 	nameTable.Info = info
 
 	if int(nameTable.Format) == 1 {
+		// Windows langTagRecord is not finish
 		nameTable.LangTagCount = getUint16(data[pos : pos+2])
 		pos += 2
 	}
