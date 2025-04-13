@@ -61,8 +61,12 @@ func getFixed(data []byte) float64 {
 	return float64(getInt32(data) / 65535)
 }
 
-func getFword(data []byte) int16 {
+func getFWord(data []byte) int16 {
 	return getInt16(data)
+}
+
+func getUFWord(data []byte) uint16 {
+	return getUint16(data)
 }
 
 func get2Dot14(data []byte) float32 {
