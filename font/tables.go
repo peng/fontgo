@@ -2,6 +2,7 @@ package font
 
 import (
 	"errors"
+	"strconv"
 )
 
 type OffsetTable struct {
@@ -68,10 +69,10 @@ func GetHead(data []byte) *Head {
 		getUint16(data[18:20]),
 		getLongDateTime(data[20:28]),
 		getLongDateTime(data[28:36]),
-		getFword(data[36:38]),
-		getFword(data[38:40]),
-		getFword(data[40:42]),
-		getFword(data[42:44]),
+		getFWord(data[36:38]),
+		getFWord(data[38:40]),
+		getFWord(data[40:42]),
+		getFWord(data[42:44]),
 		getUint16(data[44:46]),
 		getUint16(data[46:48]),
 		getInt16(data[48:50]),
@@ -141,10 +142,10 @@ func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
 	simple = new(GlyphSimple)
 	simple.Type = GLYPH_TYPE_SIMPLE
 	simple.NumberOfContours = getInt16(data[0:2])
-	simple.XMin = getFword(data[2:4])
-	simple.YMin = getFword(data[4:6])
-	simple.XMax = getFword(data[6:8])
-	simple.YMax = getFword(data[8:10])
+	simple.XMin = getFWord(data[2:4])
+	simple.YMin = getFWord(data[4:6])
+	simple.XMax = getFWord(data[6:8])
+	simple.YMax = getFWord(data[8:10])
 
 	pos = 10
 	// get endPtsOfContours
@@ -254,10 +255,10 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 
 	compound.Type = GLYPH_TYPE_COMPOUND
 	compound.NumberOfContours = getInt16(data[0:2])
-	compound.XMin = getFword(data[2:4])
-	compound.YMin = getFword(data[4:6])
-	compound.XMax = getFword(data[6:8])
-	compound.YMax = getFword(data[8:10])
+	compound.XMin = getFWord(data[2:4])
+	compound.YMin = getFWord(data[4:6])
+	compound.XMax = getFWord(data[6:8])
+	compound.YMax = getFWord(data[8:10])
 
 	var flags uint16
 	pos = 10
@@ -537,6 +538,183 @@ type CmapFormatNonDefaultUVS struct {
 	UnicodeValue int    `json:"unicodeValue"`
 	GlyphID      uint16 `json:"glyphId"`
 	VarSelector  uint32 `json:"varSelector"`
+}
+
+func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (code map[int]int, err error) {
+	var format0, format2, format4, format12, format14 map[string]interface{}
+
+	for _, val := range subTables {
+		formatSource, exist := val["format"]
+		platformIDSource, exist2 := val["platformID"]
+		platformSpecificIDSource, exist3 := val["platformSpecificID"]
+
+		if !exist || !exist2 || exist3 {
+			err = errors.New("Read platformID or platformSpecificID error")
+			return
+		}
+		format := formatSource.(int)
+		platformID := platformIDSource.(int)
+		platformSpecificID := platformSpecificIDSource.(int)
+		// https://learn.microsoft.com/en-us/typography/opentype/spec/recom#cmap-table
+		if format == 0 {
+			format0 = val
+		} else if format == 2 && platformID == 3 && platformSpecificID == 3 {
+			format2 = val
+		} else if format == 4 && platformID == 3 && platformSpecificID == 1 {
+			format4 = val
+		} else if format == 12 && platformID == 3 && platformSpecificID == 10 {
+			format12 = val
+		} else if format == 14 && platformID == 0 && platformSpecificID == 5 {
+			format14 = val
+		}
+	}
+
+	if len(format0) > 0 {
+		g, exist := format0["glyphIndexArray"]
+		if exist {
+			glyphIndexArray := g.([]uint8)
+			for ind, val := range glyphIndexArray {
+				if int(val) != 0 {
+					code[ind] = int(val)
+				}
+			}
+		}
+	}
+
+	if len(format14) > 0 {
+		groupsSource, exist := format14["groups"]
+		if exist {
+			groups := groupsSource.([]interface{})
+			for _, sVal := range groups {
+				val := sVal.([]interface{})
+				typeVal := val[0].(int)
+				if typeVal == 1 {
+					nonDefaultUVS := val[1].(CmapFormatNonDefaultUVS)
+					code[nonDefaultUVS.UnicodeValue] = int(nonDefaultUVS.GlyphID)
+				}
+			}
+		}
+	}
+
+	if len(format12) > 0 {
+		gSource, exist := format12["nGroups"]
+		if !exist {
+			err = errors.New("Read format12 nGroups error")
+			return
+		}
+		groups := gSource.([]*CmapFormat8nGroup)
+		for _, val := range groups {
+			startCharCode := int(val.StartCharCode)
+			endCharCode := int(val.EndCharCode)
+			startGlyphCode := int(val.StartGlyphCode)
+
+			for startCharCode <= endCharCode {
+				code[startCharCode] = startGlyphCode
+				startCharCode++
+				startGlyphCode++
+			}
+		}
+	} else if len(format4) > 0 {
+		segCountX2, exist1 := format4["segCountX2"]
+		startCodeSource, exist2 := format4["startCode"]
+		endCodeSource, exist3 := format4["endCode"]
+		idRangeOffsetSource, exist4 := format4["idRangeOffset"]
+		glyphIndexArrayOffsetSource, exist5 := format4["glyphIndexArrayOffset"]
+		idDeltaSource, exist6 := format4["idDelta"]
+		glyphIndexArraySource, exist7 := format4["glyphIndexArray"]
+
+		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 {
+			err = errors.New("Read format4 map error")
+			return
+		}
+
+		segCount := segCountX2.(int) / 2
+		startCode := startCodeSource.([]uint16)
+		endCode := endCodeSource.([]uint16)
+		idRangeOffset := idRangeOffsetSource.([]uint16)
+		glyphIndexArrayOffset := glyphIndexArrayOffsetSource.(int)
+		idDelta := idDeltaSource.([]uint16)
+		glyphIndexArray := glyphIndexArraySource.([]uint16)
+
+		for i := 0; i < segCount; i++ {
+			for start, end := int(startCode[i]), int(endCode[i]); start <= end; start++ {
+				if int(idRangeOffset[i]) == 0 {
+					code[start] = (start + int(idDelta[i])) % 0x10000
+				} else {
+					index := i + int(idRangeOffset[i])/2 + (start - int(startCode[i])) - glyphIndexArrayOffset
+
+					glyphIndex := int(glyphIndexArray[index])
+
+					if glyphIndex != 0 {
+						code[start] = (glyphIndex + int(idDelta[i])) % 0x10000
+					} else {
+						code[start] = 0
+					}
+				}
+			}
+		}
+
+		// wip 65535
+		delete(code, 65535)
+	} else if len(format2) > 0 {
+		subHeaderKeysS, exist1 := format2["subHeaderKeys"]
+		subHeadersS, exist2 := format2["subHeaders"]
+		glyphIndexArrayS, exist3 := format2["glyphIndexArray"]
+		maxPosS, exist4 := format2["maxPos"]
+
+		if !exist1 || !exist2 || !exist3 || !exist4 {
+			err = errors.New("Read format2 error")
+			return
+		}
+
+		subHeaderKeys := subHeaderKeysS.([]uint16)
+		subHeaders := subHeadersS.([]*CmapFormat2SubHeader)
+		glyphIndexArray := glyphIndexArrayS.([]uint16)
+		maxPos := maxPosS.(int)
+
+		index := 0
+
+		for i := 0; i < 256; i++ {
+			k := int(subHeaderKeys[i])
+			if k == 0 {
+
+				if i >= maxPos || i < int(subHeaders[0].FirstCode) || i >= int(subHeaders[0].FirstCode+subHeaders[0].EntryCount) || int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode)) >= len(glyphIndexArray) {
+					index = 0
+				} else {
+					index = int(glyphIndexArray[int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode))])
+					if index != 0 {
+						index = index + int(subHeaders[0].IdDelta)
+					}
+				}
+
+				if index != 0 && index < maxpNumGlyphs {
+					code[i] = index
+				}
+
+			} else {
+				k := int(subHeaderKeys[i])
+				entryCount := int(subHeaders[k].EntryCount)
+				for j := 0; j < entryCount; j++ {
+
+					if int(subHeaders[k].IdRangeOffset)+j >= len(glyphIndexArray) {
+						index = 0
+					} else {
+						index = int(glyphIndexArray[int(subHeaders[k].IdRangeOffset)+j])
+						if index != 0 {
+							index = index + int(subHeaders[k].IdDelta)
+						}
+					}
+
+					if index != 0 && index < maxpNumGlyphs {
+						unicode := ((i << 8) | (j + int(subHeaders[k].FirstCode))) % 0xffff
+						code[unicode] = index
+					}
+				}
+			}
+		}
+	}
+
+	return
 }
 
 func GetCmap(data []byte, prevPos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
@@ -852,183 +1030,6 @@ func GetCmap(data []byte, prevPos int, maxpNumGlyphs int) (cmap *Cmap, err error
 
 	// Read Windows support
 	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
-
-	return
-}
-
-func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (code map[int]int, err error) {
-	var format0, format2, format4, format12, format14 map[string]interface{}
-
-	for _, val := range subTables {
-		formatSource, exist := val["format"]
-		platformIDSource, exist2 := val["platformID"]
-		platformSpecificIDSource, exist3 := val["platformSpecificID"]
-
-		if !exist || !exist2 || exist3 {
-			err = errors.New("Read platformID or platformSpecificID error")
-			return
-		}
-		format := formatSource.(int)
-		platformID := platformIDSource.(int)
-		platformSpecificID := platformSpecificIDSource.(int)
-		// https://learn.microsoft.com/en-us/typography/opentype/spec/recom#cmap-table
-		if format == 0 {
-			format0 = val
-		} else if format == 2 && platformID == 3 && platformSpecificID == 3 {
-			format2 = val
-		} else if format == 4 && platformID == 3 && platformSpecificID == 1 {
-			format4 = val
-		} else if format == 12 && platformID == 3 && platformSpecificID == 10 {
-			format12 = val
-		} else if format == 14 && platformID == 0 && platformSpecificID == 5 {
-			format14 = val
-		}
-	}
-
-	if len(format0) > 0 {
-		g, exist := format0["glyphIndexArray"]
-		if exist {
-			glyphIndexArray := g.([]uint8)
-			for ind, val := range glyphIndexArray {
-				if int(val) != 0 {
-					code[ind] = int(val)
-				}
-			}
-		}
-	}
-
-	if len(format14) > 0 {
-		groupsSource, exist := format14["groups"]
-		if exist {
-			groups := groupsSource.([]interface{})
-			for _, sVal := range groups {
-				val := sVal.([]interface{})
-				typeVal := val[0].(int)
-				if typeVal == 1 {
-					nonDefaultUVS := val[1].(CmapFormatNonDefaultUVS)
-					code[nonDefaultUVS.UnicodeValue] = int(nonDefaultUVS.GlyphID)
-				}
-			}
-		}
-	}
-
-	if len(format12) > 0 {
-		gSource, exist := format12["nGroups"]
-		if !exist {
-			err = errors.New("Read format12 nGroups error")
-			return
-		}
-		groups := gSource.([]*CmapFormat8nGroup)
-		for _, val := range groups {
-			startCharCode := int(val.StartCharCode)
-			endCharCode := int(val.EndCharCode)
-			startGlyphCode := int(val.StartGlyphCode)
-
-			for startCharCode <= endCharCode {
-				code[startCharCode] = startGlyphCode
-				startCharCode++
-				startGlyphCode++
-			}
-		}
-	} else if len(format4) > 0 {
-		segCountX2, exist1 := format4["segCountX2"]
-		startCodeSource, exist2 := format4["startCode"]
-		endCodeSource, exist3 := format4["endCode"]
-		idRangeOffsetSource, exist4 := format4["idRangeOffset"]
-		glyphIndexArrayOffsetSource, exist5 := format4["glyphIndexArrayOffset"]
-		idDeltaSource, exist6 := format4["idDelta"]
-		glyphIndexArraySource, exist7 := format4["glyphIndexArray"]
-
-		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 {
-			err = errors.New("Read format4 map error")
-			return
-		}
-
-		segCount := segCountX2.(int) / 2
-		startCode := startCodeSource.([]uint16)
-		endCode := endCodeSource.([]uint16)
-		idRangeOffset := idRangeOffsetSource.([]uint16)
-		glyphIndexArrayOffset := glyphIndexArrayOffsetSource.(int)
-		idDelta := idDeltaSource.([]uint16)
-		glyphIndexArray := glyphIndexArraySource.([]uint16)
-
-		for i := 0; i < segCount; i++ {
-			for start, end := int(startCode[i]), int(endCode[i]); start <= end; start++ {
-				if int(idRangeOffset[i]) == 0 {
-					code[start] = (start + int(idDelta[i])) % 0x10000
-				} else {
-					index := i + int(idRangeOffset[i])/2 + (start - int(startCode[i])) - glyphIndexArrayOffset
-
-					glyphIndex := int(glyphIndexArray[index])
-
-					if glyphIndex != 0 {
-						code[start] = (glyphIndex + int(idDelta[i])) % 0x10000
-					} else {
-						code[start] = 0
-					}
-				}
-			}
-		}
-
-		// wip 65535
-		delete(code, 65535)
-	} else if len(format2) > 0 {
-		subHeaderKeysS, exist1 := format2["subHeaderKeys"]
-		subHeadersS, exist2 := format2["subHeaders"]
-		glyphIndexArrayS, exist3 := format2["glyphIndexArray"]
-		maxPosS, exist4 := format2["maxPos"]
-
-		if !exist1 || !exist2 || !exist3 || !exist4 {
-			err = errors.New("Read format2 error")
-			return
-		}
-
-		subHeaderKeys := subHeaderKeysS.([]uint16)
-		subHeaders := subHeadersS.([]*CmapFormat2SubHeader)
-		glyphIndexArray := glyphIndexArrayS.([]uint16)
-		maxPos := maxPosS.(int)
-
-		index := 0
-
-		for i := 0; i < 256; i++ {
-			k := int(subHeaderKeys[i])
-			if k == 0 {
-
-				if i >= maxPos || i < int(subHeaders[0].FirstCode) || i >= int(subHeaders[0].FirstCode+subHeaders[0].EntryCount) || int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode)) >= len(glyphIndexArray) {
-					index = 0
-				} else {
-					index = int(glyphIndexArray[int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode))])
-					if index != 0 {
-						index = index + int(subHeaders[0].IdDelta)
-					}
-				}
-
-				if index != 0 && index < maxpNumGlyphs {
-					code[i] = index
-				}
-
-			} else {
-				k := int(subHeaderKeys[i])
-				entryCount := int(subHeaders[k].EntryCount)
-				for j := 0; j < entryCount; j++ {
-
-					if int(subHeaders[k].IdRangeOffset)+j >= len(glyphIndexArray) {
-						index = 0
-					} else {
-						index = int(glyphIndexArray[int(subHeaders[k].IdRangeOffset)+j])
-						if index != 0 {
-							index = index + int(subHeaders[k].IdDelta)
-						}
-					}
-
-					if index != 0 && index < maxpNumGlyphs {
-						unicode := ((i << 8) | (j + int(subHeaders[k].FirstCode))) % 0xffff
-						code[unicode] = index
-					}
-				}
-			}
-		}
-	}
 
 	return
 }
@@ -1750,5 +1751,168 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 		nameTable.LangTagCount = getUint16(data[pos : pos+2])
 		pos += 2
 	}
+	return
+}
+
+type Hhea struct {
+	Version             float64 `json:"version"`
+	Ascent              int16   `json:"ascent"`
+	Descent             int16   `json:"descent"`
+	LineGap             int16   `json:"lineGap"`
+	AdvanceWidthMax     uint16  `json:"advanceWidthMax"`
+	MinLeftSideBearing  int16   `json:"minLeftSideBearing"`
+	MinRightSideBearing int16   `json:"minRightSideBearing"`
+	XMaxExtent          int16   `json:"xMaxExtent"`
+	CaretSlopeRise      int16   `json:"caretSlopeRise"`
+	CaretSlopeRun       int16   `json:"caretSlopeRun"`
+	CaretOffset         int16   `json:"caretOffset"`
+	Reserved1           int16   `json:"reserved1"`
+	Reserved2           int16   `json:"reserved2"`
+	Reserved3           int16   `json:"reserved3"`
+	Reserved4           int16   `json:"reserved4"`
+	MetricDataFormat    int16   `json:"metricDataFormat"`
+	NumOfLongHorMetrics uint16  `json:"numOfLongHorMetrics"`
+}
+
+func GetHhea(data []byte, pos int) (hhea *Hhea) {
+	hhea = &Hhea{
+		getFixed(data[pos : pos+2]),
+		getFWord(data[pos+2 : pos+4]),
+		getFWord(data[pos+4 : pos+6]),
+		getFWord(data[pos+6 : pos+8]),
+		getUFWord(data[pos+8 : pos+10]),
+		getFWord(data[pos+10 : pos+12]),
+		getFWord(data[pos+12 : pos+14]),
+		getFWord(data[pos+14 : pos+16]),
+		getInt16(data[pos+16 : pos+18]),
+		getInt16(data[pos+18 : pos+20]),
+		getFWord(data[pos+20 : pos+22]),
+		getInt16(data[pos+22 : pos+24]),
+		getInt16(data[pos+24 : pos+26]),
+		getInt16(data[pos+26 : pos+28]),
+		getInt16(data[pos+28 : pos+30]),
+		getInt16(data[pos+30 : pos+32]),
+		getUint16(data[pos+32 : pos+34]),
+	}
+	return
+}
+
+type LongHorMetric struct {
+	AdvanceWidth    uint16 `json:"advanceWidth"`
+	LeftSideBearing int16  `json:"leftSideBearing"`
+}
+
+type Hmtx struct {
+	HMetrics        []*LongHorMetric `json:"hMetrics"`
+	LeftSideBearing []int16          `json:"leftSideBearing"`
+}
+
+func GetHmtx(data []byte, pos int, numOfLongHorMetrics int, numGlyph int) (hmtx *Hmtx) {
+	hmtx = new(Hmtx)
+
+	for i := 0; i < numOfLongHorMetrics; i++ {
+		hmtx.HMetrics = append(hmtx.HMetrics, &LongHorMetric{
+			getUint16(data[pos : pos+2]),
+			getInt16(data[pos+2 : pos+4]),
+		})
+		pos += 4
+	}
+
+	for i := 0; i < (numGlyph - numOfLongHorMetrics); i++ {
+		hmtx.LeftSideBearing = append(hmtx.LeftSideBearing, getInt16(data[pos:pos+2]))
+		pos += 2
+	}
+	return
+}
+
+type nPairs struct {
+	Left  uint16 `json:"left"`
+	Right uint16 `json:"right"`
+	Value int16  `json:"value"`
+}
+
+func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernPairs []*nPairs) {
+	subHeaders["version"] = int(getUint16(data[pos : pos+2]))
+	subHeaders["length"] = int(getUint16(data[pos+2 : pos+4]))
+	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
+	// Missing format 2
+	if subHeaders["version"] == 0 {
+		subHeaders["nPairs"] = int(getUint16(data[pos+6 : pos+8]))
+		subHeaders["searchRange"] = int(getUint16(data[pos+8 : pos+10]))
+		subHeaders["entrySelector"] = int(getUint16(data[pos+10 : pos+12]))
+		subHeaders["rangeShift"] = int(getUint16(data[pos+12 : pos+14]))
+		pos += 14
+		nP := int(subHeaders["nPairs"])
+		for i := 0; i < nP; i++ {
+			kernPairs = append(kernPairs, &nPairs{
+				getUint16(data[pos : pos+2]),
+				getUint16(data[pos+2 : pos+4]),
+				getFWord(data[pos+4 : pos+6]),
+			})
+			pos += 6
+		}
+	}
+	return
+}
+
+func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]int, kernPairs []*nPairs) {
+	subHeaders["length"] = int(getUint32(data[pos : pos+4]))
+	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
+	tupleIndex := getUint16(data[pos+6 : pos+8])
+	subHeaders["tupleIndex"] = int(tupleIndex)
+	subHeaders["nPairs"] = int(getUint16(data[pos+8 : pos+10]))
+	subHeaders["searchRange"] = int(getUint16(data[pos+10 : pos+12]))
+	subHeaders["entrySelector"] = int(getUint16(data[pos+12 : pos+14]))
+	subHeaders["rangeShift"] = int(getUint16(data[pos+14 : pos+16]))
+	subHeaders["version"] = int(tupleIndex & 0x00FF)
+	pos += 16
+	if nTables == 1 {
+		// Not support table 2 3
+		if subHeaders["version"] == 0 {
+			for i := 0; i < subHeaders["nPairs"]; i++ {
+				kernPairs = append(kernPairs, &nPairs{
+					getUint16(data[pos : pos+2]),
+					getUint16(data[pos+2 : pos+4]),
+					getFWord(data[pos+4 : pos+6]),
+				})
+				pos += 6
+			}
+		}
+	}
+}
+
+type Kern struct {
+	Version      int
+	NTables      int
+	SubHeaders   map[string]int
+	Pairs        []*nPairs
+	IsMacNewKern bool `json:"isNewKern,omitempty"`
+}
+
+func GetKern(data []byte, pos int) (kern *Kern, err error) {
+	kern = new(Kern)
+	version := int(getUint16(data[pos : pos+2]))
+	nTables := int(getUint16(data[pos+2 : pos+4]))
+	kern.Version = version
+	kern.NTables = nTables
+	if version == 0 {
+		pos += 4
+		kern.SubHeaders, kern.Pairs = getWindowsKernTable(data, pos)
+		return
+	} else if version == 1 {
+		var isNewKern bool
+		pos += 4
+		// If nTables is 0, use new Mac kern header.
+		if nTables == 0 {
+			isNewKern = true
+			nTables = int(getUint32(data[pos : pos+4]))
+			pos += 4
+		}
+		kern.IsMacNewKern = isNewKern
+		kern.SubHeaders, kern.Pairs = getMacKernTable(data, pos, nTables)
+		return
+	}
+
+	err = errors.New("Unsupported kern table version:" + strconv.Itoa(version))
 	return
 }
