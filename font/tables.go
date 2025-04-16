@@ -1879,6 +1879,7 @@ func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]i
 			}
 		}
 	}
+	return
 }
 
 type Kern struct {
@@ -1914,5 +1915,117 @@ func GetKern(data []byte, pos int) (kern *Kern, err error) {
 	}
 
 	err = errors.New("Unsupported kern table version:" + strconv.Itoa(version))
+	return
+}
+
+type FastSetKVOpt struct {
+	data    []byte
+	pos     int
+	key     string
+	valType string
+	toInt   bool
+}
+
+type OS2 struct {
+	Version             uint16   `json:"version"`
+	XAvgCharWidth       int16    `json:"xAvgCharWidth"`
+	UsWeightClass       uint16   `json:"usWeightClass"`
+	UsWidthClass        uint16   `json:"usWidthClass"`
+	FsType              int16    `json:"fsType"`
+	YSubscriptXSize     int16    `json:"ySubscriptXSize"`
+	YSubscriptYSize     int16    `json:"ySubscriptYSize"`
+	YSubscriptXOffset   int16    `json:"ySubscriptXOffset"`
+	YSubscriptYOffset   int16    `json:"ySubscriptYOffset"`
+	YSuperscriptXSize   int16    `json:"ySuperscriptXSize"`
+	YSuperscriptYSize   int16    `json:"ySuperscriptYSize"`
+	YSuperscriptXOffset int16    `json:"ySuperscriptXOffset"`
+	YSuperscriptYOffset int16    `json:"ySuperscriptYOffset"`
+	YStrikeoutSize      int16    `json:"yStrikeoutSize"`
+	YStrikeoutPosition  int16    `json:"yStrikeoutPosition"`
+	SFamilyClass        int16    `json:"sFamilyClass"`
+	Panose              []uint8  `json:"panose"`
+	UlUnicodeRange      []uint32 `json:"ulUnicodeRange"`
+	AchVendID           string   `json:"achVendId"`
+	FsSelection         uint16   `json:"fsSelection"`
+	FsFirstCharIndex    uint16   `json:"fsFirstCharIndex"`
+	FsLastCharIndex     uint16   `json:"fsLastCharIndexm"`
+	STypoAscender       int16    `json:"sTypoAscender"`
+	STypoDescender      int16    `json:"sTypoDescender"`
+	STypoLineGap        int16    `json:"sTypoLineGap"`
+	UsWinAscent         uint16   `json:"usWinAscent"`
+	UsWinDescent        uint16   `json:"usWinDescent"`
+	UlCodePageRange     []uint32 `json:"ulCodePageRange,omitempty"`
+	SxHeight            int16    `json:"sxHeight,omitempty"`
+	SCapHeight          int16    `json:"sCapHeight,omitempty"`
+	UsDefaultChar       uint16   `json:"usDefaultChar,omitempty"`
+	UsBreakChar         uint16   `json:"usBreakChar,omitempty"`
+	UsMaxContext        uint16   `json:"usMaxContext,omitempty"`
+	UsLowerPointSize    uint16   `json:"usLowerPointSize,omitempty"`
+	UsUpperPointSize    uint16   `json:"usUpperPointSize,omitempty"`
+}
+
+func GetOS2(data []byte, pos int) (os2 *OS2) {
+	os2.Version = getUint16(data[pos : pos+2])
+	os2.XAvgCharWidth = getInt16(data[pos+2 : pos+4])
+	os2.UsWeightClass = getUint16(data[pos+4 : pos+6])
+	os2.UsWidthClass = getUint16(data[pos+6 : pos+8])
+	os2.FsType = getInt16(data[pos+8 : pos+10])
+	os2.YSubscriptXSize = getInt16(data[pos+10 : pos+12])
+	os2.YSubscriptYSize = getInt16(data[pos+12 : pos+14])
+	os2.YSubscriptXOffset = getInt16(data[pos+14 : pos+16])
+	os2.YSubscriptYOffset = getInt16(data[pos+16 : pos+18])
+	os2.YSuperscriptXSize = getInt16(data[pos+18 : pos+20])
+	os2.YSuperscriptYSize = getInt16(data[pos+20 : pos+22])
+	os2.YSuperscriptXOffset = getInt16(data[pos+22 : pos+24])
+	os2.YSuperscriptYOffset = getInt16(data[pos+24 : pos+26])
+	os2.YStrikeoutSize = getInt16(data[pos+26 : pos+28])
+	os2.YStrikeoutPosition = getInt16(data[pos+28 : pos+30])
+	os2.SFamilyClass = getInt16(data[pos+30 : pos+32])
+	pos += 32
+	for i := 0; i < 10; i++ {
+		os2.Panose = append(os2.Panose, getUint8(data[pos:pos+1]))
+		pos++
+	}
+	for i := 0; i < 4; i++ {
+		os2.UlUnicodeRange = append(os2.UlUnicodeRange, getUint32(data[pos:pos+4]))
+		pos += 4
+	}
+
+	// achVendIDSlice
+	var achVendIDSl []int
+	for i := 0; i < 4; i++ {
+		achVendIDSl = append(achVendIDSl, int(getInt8(data[pos:pos+1])))
+		pos++
+	}
+	os2.AchVendID = FromCharCode(achVendIDSl)
+	os2.FsSelection = getUint16(data[pos : pos+2])
+	os2.FsFirstCharIndex = getUint16(data[pos+2 : pos+4])
+	os2.FsLastCharIndex = getUint16(data[pos+4 : pos+6])
+	os2.STypoAscender = getInt16(data[pos+6 : pos+8])
+	os2.STypoDescender = getInt16(data[pos+8 : pos+10])
+	os2.STypoLineGap = getInt16(data[pos+10 : pos+12])
+	os2.UsWinAscent = getUint16(data[pos+12 : pos+14])
+	os2.UsWinDescent = getUint16(data[pos+14 : pos+16])
+	pos += 16
+
+	version := int(os2.Version)
+	if version >= 1 {
+		os2.UlCodePageRange = append(os2.UlCodePageRange, getUint32(data[pos:pos+4]))
+		pos += 4
+	}
+
+	if version >= 2 {
+		os2.SxHeight = getInt16(data[pos : pos+2])
+		os2.SCapHeight = getInt16(data[pos+2 : pos+4])
+		os2.UsDefaultChar = getUint16(data[pos+4 : pos+6])
+		os2.UsBreakChar = getUint16(data[pos+6 : pos+8])
+		os2.UsMaxContext = getUint16(data[pos+8 : pos+10])
+	}
+	pos += 10
+	if version == 5 {
+		os2.UsLowerPointSize = getUint16(data[pos : pos+2])
+		os2.UsUpperPointSize = getUint16(data[pos+2 : pos+4])
+	}
+
 	return
 }

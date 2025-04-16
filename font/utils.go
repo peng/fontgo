@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf16"
 )
@@ -156,4 +157,12 @@ func DecodeMACSTRING(data []byte, offset int, dataLength int, platformSpecifi st
 	}
 
 	return result
+}
+
+func FromCharCode(data []int) string {
+	var str strings.Builder
+	for _, val := range data {
+		str.WriteRune(rune(val))
+	}
+	return str.String()
 }

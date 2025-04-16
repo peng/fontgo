@@ -19,6 +19,7 @@ type Tables struct {
 	Hhea *Hhea      `json:"hhea,omitempty"`
 	Hmtx *Hmtx      `json:"hmtx,omitempty"`
 	Kern *Kern      `json:"kern,omitempty"`
+	Os2  *OS2       `json:"os2"`
 }
 
 type Directory struct {
@@ -51,6 +52,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	hheaInfo, existHhea := tableContent["hhea"]
 	hmtxInfo, existHmtx := tableContent["hmtx"]
 	kernInfo, existKern := tableContent["kern"]
+	os2Info, existOs2 := tableContent["OS/2"]
 	// add test
 
 	// tables content
@@ -82,6 +84,10 @@ func DataReader(filePath string) (directory *Directory, err error) {
 
 	if existKern {
 		tables.Kern, err = GetKern(fileByte, int(kernInfo.Offset))
+	}
+
+	if existOs2 {
+		tables.Os2 = GetOS2(fileByte, int(os2Info.Offset))
 	}
 
 	directory = new(Directory)
