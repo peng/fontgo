@@ -166,3 +166,12 @@ func FromCharCode(data []int) string {
 	}
 	return str.String()
 }
+
+func FromCharCodeByte(data []byte) string {
+	var toInt []int
+	for _, val := range data {
+		toInt = append(toInt, int(val))
+	}
+
+	return FromCharCode(toInt)
+}

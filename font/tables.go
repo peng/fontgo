@@ -2029,3 +2029,105 @@ func GetOS2(data []byte, pos int) (os2 *OS2) {
 
 	return
 }
+
+var standardNames = []string{
+	".notdef", ".null", "nonmarkingreturn", "space", "exclam", "quotedbl", "numbersign", "dollar", "percent",
+	"ampersand", "quotesingle", "parenleft", "parenright", "asterisk", "plus", "comma", "hyphen", "period", "slash",
+	"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "colon", "semicolon", "less",
+	"equal", "greater", "question", "at", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O",
+	"P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "bracketleft", "backslash", "bracketright",
+	"asciicircum", "underscore", "grave", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o",
+	"p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "braceleft", "bar", "braceright", "asciitilde",
+	"Adieresis", "Aring", "Ccedilla", "Eacute", "Ntilde", "Odieresis", "Udieresis", "aacute", "agrave",
+	"acircumflex", "adieresis", "atilde", "aring", "ccedilla", "eacute", "egrave", "ecircumflex", "edieresis",
+	"iacute", "igrave", "icircumflex", "idieresis", "ntilde", "oacute", "ograve", "ocircumflex", "odieresis",
+	"otilde", "uacute", "ugrave", "ucircumflex", "udieresis", "dagger", "degree", "cent", "sterling", "section",
+	"bullet", "paragraph", "germandbls", "registered", "copyright", "trademark", "acute", "dieresis", "notequal",
+	"AE", "Oslash", "infinity", "plusminus", "lessequal", "greaterequal", "yen", "mu", "partialdiff", "summation",
+	"product", "pi", "integral", "ordfeminine", "ordmasculine", "Omega", "ae", "oslash", "questiondown",
+	"exclamdown", "logicalnot", "radical", "florin", "approxequal", "Delta", "guillemotleft", "guillemotright",
+	"ellipsis", "nonbreakingspace", "Agrave", "Atilde", "Otilde", "OE", "oe", "endash", "emdash", "quotedblleft",
+	"quotedblright", "quoteleft", "quoteright", "divide", "lozenge", "ydieresis", "Ydieresis", "fraction",
+	"currency", "guilsinglleft", "guilsinglright", "fi", "fl", "daggerdbl", "periodcentered", "quotesinglbase",
+	"quotedblbase", "perthousand", "Acircumflex", "Ecircumflex", "Aacute", "Edieresis", "Egrave", "Iacute",
+	"Icircumflex", "Idieresis", "Igrave", "Oacute", "Ocircumflex", "apple", "Ograve", "Uacute", "Ucircumflex",
+	"Ugrave", "dotlessi", "circumflex", "tilde", "macron", "breve", "dotaccent", "ring", "cedilla", "hungarumlaut",
+	"ogonek", "caron", "Lslash", "lslash", "Scaron", "scaron", "Zcaron", "zcaron", "brokenbar", "Eth", "eth",
+	"Yacute", "yacute", "Thorn", "thorn", "minus", "multiply", "onesuperior", "twosuperior", "threesuperior",
+	"onehalf", "onequarter", "threequarters", "franc", "Gbreve", "gbreve", "Idotaccent", "Scedilla", "scedilla",
+	"Cacute", "cacute", "Ccaron", "ccaron", "dcroat",
+}
+
+type Post struct {
+	Format             float64  `json:"format"`
+	ItalicAngle        float64  `json:"italicAngle"`
+	UnderlinePosition  int16    `json:"underlinePosition"`
+	UnderlineThickness int16    `json:"underlineThickness"`
+	IsFixedPitch       uint32   `json:"isFixedPitch"`
+	MinMemType42       uint32   `json:"minMemType42"`
+	MaxMemType42       uint32   `json:"maxMemType42"`
+	MinMemType1        uint32   `json:"minMemType1"`
+	MaxMemType1        uint32   `json:"maxMemType1"`
+	Names              []string `json:"names,omitempty"`
+	NumberOfGlyphs     uint16   `json:"numberOfGlyphs,omitempty"`
+	GlyphNameIndex     []uint16 `json:"glyphNameIndex,omitempty"`
+	Offset             []int8   `json:"offset,omitempty"`
+}
+
+func GetPost(data []byte, pos int) (post *Post) {
+	post.Format = getFixed(data[pos : pos+4])
+	post.ItalicAngle = getFixed(data[pos+4 : pos+8])
+	post.UnderlinePosition = getFWord(data[pos+8 : pos+10])
+	post.UnderlineThickness = getFWord(data[pos+10 : pos+12])
+	post.IsFixedPitch = getUint32(data[pos+12 : pos+16])
+	post.MinMemType42 = getUint32(data[pos+16 : pos+20])
+	post.MaxMemType42 = getUint32(data[pos+20 : pos+24])
+	post.MinMemType1 = getUint32(data[pos+24 : pos+28])
+	post.MaxMemType1 = getUint32(data[pos+28 : pos+32])
+	pos += 32
+	// post = &Post{
+	// 	getFixed(data[pos : pos+4]),
+	// 	getFixed(data[pos+4 : pos+8]),
+	// 	getFWord(data[pos+8 : pos+10]),
+	// 	getFWord(data[pos+10 : pos+12]),
+	// 	getUint32(data[pos+12 : pos+16]),
+	// 	getUint32(data[pos+16 : pos+20]),
+	// 	getUint32(data[pos+20 : pos+24]),
+	// 	getUint32(data[pos+24 : pos+28]),
+	// 	getUint32(data[pos+28 : pos+32]),
+	// }
+
+	format := post.Format
+
+	if format == 1 {
+		post.Names = standardNames
+	} else if format == 2 {
+		post.NumberOfGlyphs = getUint16(data[pos : pos+2])
+		pos += 2
+		numberOfGlyphs := int(post.NumberOfGlyphs)
+		for i := 0; i < numberOfGlyphs; i++ {
+			post.GlyphNameIndex = append(post.GlyphNameIndex, getUint16(data[pos:pos+2]))
+			pos += 2
+		}
+
+		for i := 0; i < numberOfGlyphs; i++ {
+			// post.Names = append(post.Names, get)
+			if int(post.GlyphNameIndex[i]) >= len(standardNames) {
+				nameLen := int(getInt8(data[pos : pos+1]))
+				pos++
+
+				post.Names = append(post.Names, FromCharCodeByte(data[pos:pos+nameLen]))
+				pos += nameLen
+			}
+		}
+	} else if format == 2.5 {
+		post.NumberOfGlyphs = getUint16(data[pos : pos+2])
+		pos += 2
+		numberOfGlyphs := int(post.NumberOfGlyphs)
+		for i := 0; i < numberOfGlyphs; i++ {
+			post.Offset = append(post.Offset, getInt8(data[pos:pos+1]))
+			pos++
+		}
+	}
+	return
+}
