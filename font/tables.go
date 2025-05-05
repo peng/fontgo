@@ -2085,17 +2085,6 @@ func GetPost(data []byte, pos int) (post *Post) {
 	post.MinMemType1 = getUint32(data[pos+24 : pos+28])
 	post.MaxMemType1 = getUint32(data[pos+28 : pos+32])
 	pos += 32
-	// post = &Post{
-	// 	getFixed(data[pos : pos+4]),
-	// 	getFixed(data[pos+4 : pos+8]),
-	// 	getFWord(data[pos+8 : pos+10]),
-	// 	getFWord(data[pos+10 : pos+12]),
-	// 	getUint32(data[pos+12 : pos+16]),
-	// 	getUint32(data[pos+16 : pos+20]),
-	// 	getUint32(data[pos+20 : pos+24]),
-	// 	getUint32(data[pos+24 : pos+28]),
-	// 	getUint32(data[pos+28 : pos+32]),
-	// }
 
 	format := post.Format
 
@@ -2129,5 +2118,71 @@ func GetPost(data []byte, pos int) (post *Post) {
 			pos++
 		}
 	}
+	return
+}
+
+type SfntVariationAxis struct {
+	AxisTag      uint32 `json:"axisTag"`
+	MinValue     uint32 `json:"minValue"`
+	DefaultValue uint32 `json:"defaultValue"`
+	MaxValue     uint32 `json:"maxValue"`
+	Flags        uint16 `json:"flags"`
+	NameID       uint16 `json:"nameId"`
+}
+type SfntInstance struct {
+	NameID   uint16 `json:"nameId"`
+	Flags    uint16 `json:"flags"`
+	Coord    uint32 `json:"coord"`
+	PsNameID uint16 `json:"psNameId"`
+}
+type Fvar struct {
+	Version        string               `json:"version"`
+	OffsetToData   uint16               `json:"offsetToData"`
+	CountSizePairs uint16               `json:"countSizePairs"`
+	AxisCount      uint16               `json:"axisCount"`
+	AxisSize       uint16               `json:"axisSize"`
+	InstanceCount  uint16               `json:"instanceCount"`
+	InstanceSize   uint16               `json:"instanceSize"`
+	Axis           []*SfntVariationAxis `json:"axis"`
+	Instance       []*SfntInstance      `json:"instance"`
+}
+
+func GetFvar(data []byte, pos int) (fvar *Fvar) {
+	majorVersion := strconv.Itoa(int(getUint16(data[pos : pos+2])))
+	minorVersion := strconv.Itoa(int(getUint16(data[pos+2 : pos+4])))
+	fvar.Version = (majorVersion + minorVersion)
+	pos += 4
+	fvar.OffsetToData = getUint16(data[pos : pos+2])
+	fvar.CountSizePairs = getUint16(data[pos+2 : pos+4])
+	fvar.AxisCount = getUint16(data[pos+6 : pos+8])
+	fvar.AxisSize = getUint16(data[pos+10 : pos+12])
+	fvar.InstanceCount = getUint16(data[pos+12 : pos+14])
+	fvar.InstanceSize = getUint16(data[pos+14 : pos+16])
+	pos += 16
+
+	axisCount := int(fvar.AxisCount)
+	for i := 0; i < axisCount; i++ {
+		fvar.Axis = append(fvar.Axis, &SfntVariationAxis{
+			getUint32(data[pos : pos+4]),
+			getFixed32(data[pos+4 : pos+8]),
+			getFixed32(data[pos+8 : pos+12]),
+			getFixed32(data[pos+12 : pos+16]),
+			getUint16(data[pos+16 : pos+18]),
+			getUint16(data[pos+18 : pos+20]),
+		})
+		pos += 20
+	}
+
+	instanceCount := int(fvar.InstanceCount)
+	for i := 0; i < instanceCount; i++ {
+		fvar.Instance = append(fvar.Instance, &SfntInstance{
+			getUint16(data[pos : pos+2]),
+			getUint16(data[pos+2 : pos+4]),
+			getFixed32(data[pos+4 : pos+8]),
+			getUint16(data[pos+8 : pos+10]),
+		})
+		pos += 10
+	}
+
 	return
 }

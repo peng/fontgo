@@ -20,6 +20,8 @@ type Tables struct {
 	Hmtx *Hmtx      `json:"hmtx,omitempty"`
 	Kern *Kern      `json:"kern,omitempty"`
 	Os2  *OS2       `json:"os2"`
+	Post *Post      `json:"post"`
+	Fvar *Fvar      `json:"fvar"`
 }
 
 type Directory struct {
@@ -53,6 +55,8 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	hmtxInfo, existHmtx := tableContent["hmtx"]
 	kernInfo, existKern := tableContent["kern"]
 	os2Info, existOs2 := tableContent["OS/2"]
+	postInfo, existPost := tableContent["post"]
+	fvarInfo, existFvar := tableContent["fvar"]
 	// add test
 
 	// tables content
@@ -88,6 +92,14 @@ func DataReader(filePath string) (directory *Directory, err error) {
 
 	if existOs2 {
 		tables.Os2 = GetOS2(fileByte, int(os2Info.Offset))
+	}
+
+	if existPost {
+		tables.Post = GetPost(fileByte, int(postInfo.Offset))
+	}
+
+	if existFvar {
+		tables.Fvar = GetFvar(fileByte, int(fvarInfo.Offset))
 	}
 
 	directory = new(Directory)
