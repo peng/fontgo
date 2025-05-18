@@ -2186,3 +2186,26 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 
 	return
 }
+
+type Itag struct {
+	Version  uint32
+	NumTags  uint32
+	TagRange []string
+}
+
+func GetItag(data []byte, pos int) (itag *Itag) {
+	start := pos
+	itag.Version = getUint32(data[pos : pos+4])
+	// skip flags
+	itag.NumTags = getUint32(data[pos+8 : pos+12])
+	pos += 12
+	num := int(itag.NumTags)
+
+	for i := 0; i < num; i++ {
+		offset := start + int(getUint16(data[pos:pos+2]))
+		len := int(getUint16(data[pos+2 : pos+4]))
+		tag := FromCharCodeByte(data[offset : offset+len])
+		itag.TagRange = append(itag.TagRange, tag)
+	}
+	return
+}
