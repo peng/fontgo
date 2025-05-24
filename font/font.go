@@ -23,6 +23,7 @@ type Tables struct {
 	Post *Post      `json:"post"`
 	Fvar *Fvar      `json:"fvar"`
 	Itag *Itag      `json:"itag,omitempty"`
+	Meta *Meta      `json:"meta"`
 }
 
 type Directory struct {
@@ -59,6 +60,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	postInfo, existPost := tableContent["post"]
 	fvarInfo, existFvar := tableContent["fvar"]
 	itagInfo, existItag := tableContent["Itag"]
+	metaInfo, existMeta := tableContent["meta"]
 	// add test
 
 	// tables content
@@ -105,7 +107,18 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	}
 
 	if existItag {
-		tables.Itag = GetItag(fileByte, int(itagInfo.Offset))
+		itag, itagErr := GetItag(fileByte, int(itagInfo.Offset))
+		if itagErr == nil {
+			tables.Itag = itag
+		}
+	}
+
+	if existMeta {
+		meta, metaErr := GetMeta(fileByte, int(metaInfo.Offset))
+
+		if metaErr == nil {
+			tables.Meta = meta
+		}
 	}
 
 	directory = new(Directory)

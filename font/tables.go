@@ -2188,14 +2188,20 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 }
 
 type Itag struct {
-	Version  uint32
-	NumTags  uint32
-	TagRange []string
+	Version  uint32   `json:"version"`
+	NumTags  uint32   `json:"numTags"`
+	TagRange []string `json:"tagRange"`
 }
 
-func GetItag(data []byte, pos int) (itag *Itag) {
+func GetItag(data []byte, pos int) (itag *Itag, err error) {
 	start := pos
 	itag.Version = getUint32(data[pos : pos+4])
+
+	if int(itag.Version) != 1 {
+		err = errors.New("Unsupported ltag table version.")
+		return
+	}
+
 	// skip flags
 	itag.NumTags = getUint32(data[pos+8 : pos+12])
 	pos += 12
@@ -2204,8 +2210,45 @@ func GetItag(data []byte, pos int) (itag *Itag) {
 	for i := 0; i < num; i++ {
 		offset := start + int(getUint16(data[pos:pos+2]))
 		len := int(getUint16(data[pos+2 : pos+4]))
+		pos += 4
 		tag := FromCharCodeByte(data[offset : offset+len])
 		itag.TagRange = append(itag.TagRange, tag)
 	}
+	return
+}
+
+type Meta struct {
+	Version     uint32            `json:"version"`
+	Flags       uint32            `json:"flags"`
+	DataOffset  uint32            `json:"dataOffset"`
+	NumDataMaps uint32            `json:"numDataMaps"`
+	Tags        map[string]string `json:"tags"`
+}
+
+func GetMeta(data []byte, pos int) (meta *Meta, err error) {
+	start := pos
+	meta.Version = getUint32(data[pos : pos+4])
+	pos += 4
+	if int(meta.Version) != 1 {
+		err = errors.New("Unsupported META table version.")
+		return
+	}
+	meta.Flags = getUint32(data[pos : pos+4])
+	meta.DataOffset = getUint32(data[pos+4 : pos+8])
+	meta.NumDataMaps = getUint32(data[pos+8 : pos+12])
+	pos += 12
+
+	num := int(meta.NumDataMaps)
+	var tags map[string]string
+	for i := 0; i < num; i++ {
+		tag := FromCharCodeByte(data[pos : pos+4])
+		offset := getUint32(data[pos+4 : pos+8])
+		len := getUint32(data[pos+8 : pos+12])
+		pos += 12
+		textS := start + int(offset)
+		text := FromCharCodeByte(data[textS : textS+int(len)])
+		tags[tag] = text
+	}
+	meta.Tags = tags
 	return
 }
