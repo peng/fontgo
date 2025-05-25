@@ -6,16 +6,28 @@ import (
 )
 
 type OffsetTable struct {
-	ScalerType    uint32 `json:"scalerType"`
+	ScalerType    string `json:"scalerType"`
 	NumTables     uint16 `json:"numTables"`
 	SearchRange   uint16 `json:"searchRange"`
 	EntrySelector uint16 `json:"entrySelector"`
 	RangeShift    uint16 `json:"rangeShift"`
 }
 
+func GetScalerType(data []byte) string {
+	n := int(getUint32(data[0:4]))
+	if n == 65536 || n == 1953658213 {
+		return "TrueType"
+	} else if n == 1954115633 {
+		return "typ1"
+	} else if n == 1330926671 {
+		return "OTTO"
+	}
+	return ""
+}
+
 func GetOffsetTable(data []byte) *OffsetTable {
 	return &OffsetTable{
-		getUint32(data[:4]),
+		GetScalerType(data[0:4]),
 		getUint16(data[4:6]),
 		getUint16(data[6:8]),
 		getUint16(data[8:10]),
@@ -23,8 +35,10 @@ func GetOffsetTable(data []byte) *OffsetTable {
 	}
 }
 
-func GetTableContent(numTables int, date []byte) map[string]*TagItem {
-	tableContent := make(map[string]*TagItem)
+type TableContent map[string]*TagItem
+
+func GetTableContent(numTables int, date []byte) TableContent {
+	tableContent := make(TableContent)
 	pos := 12
 	for i := 0; i < numTables; i++ {
 		tagName := getString(date[pos : pos+4])
