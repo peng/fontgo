@@ -44,7 +44,7 @@ func TestAllTable(t *testing.T) {
 	}
 	if !reflect.DeepEqual(*offsetTable, *sOffsetTable) {
 		fmt.Println("standData offsetTable", sOffsetTable)
-		fmt.Println("source offsetTable", offsetTable)
+		fmt.Println("offsetTable", offsetTable)
 		t.Log("offsetTable error")
 		t.Fail()
 		return
@@ -162,15 +162,60 @@ func TestAllTable(t *testing.T) {
 
 	if !reflect.DeepEqual(sTableContent, tableContent) {
 		fmt.Println("standData tableConent", sOffsetTable)
-		fmt.Println("source tableConent", offsetTable)
+		fmt.Println("tableConent", offsetTable)
 		t.Log("tableConent error")
 		t.Fail()
 		return
 	}
+	// head table expected values:
+	// checkSumAdjustment: 3928619034
+	// created: 1553718651
+	// flags: 13
+	// fontDirectionHint: 1
+	// fontRevision: 1
+	// glyphDataFormat: 0
+	// indexToLocFormat: 1
+	// lowestRecPPEM: 6
+	// macStyle: 0
+	// magicNumber: 1594834165
+	// modified: 1554811201
+	// unitsPerEm: 2048
+	// version: 1
+	// xMax: 3128
+	// xMin: -183
+	// yMax: 1930
+	// yMin: -632
 
-	// // check head table
-	// headInfo := tableContent["head"]
-	// head := GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
+	// check head table
+	headInfo := tableContent["head"]
+	head := GetHead(fileByte, int(headInfo.Offset))
+	sHead := &Head{
+		Version:            1,
+		FontRevision:       1,
+		CheckSumAdjustment: 3928619034,
+		MagicNumber:        1594834165,
+		Flags:              13,
+		UnitsPerEm:         2048,
+		Created:            1553718651,
+		Modified:           1554811201,
+		XMin:               -183,
+		YMin:               -632,
+		XMax:               3128,
+		YMax:               1930,
+		MacStyle:           0,
+		LowestRecPPEM:      6,
+		FontDirectionHint:  1,
+		IndexToLocFormat:   1,
+		GlyphDataFormat:    0,
+	}
+
+	if !reflect.DeepEqual(sHead, head) {
+		fmt.Println("standData head", sHead)
+		fmt.Println("head", head)
+		t.Log("head error")
+		t.Fail()
+		return
+	}
 
 	// if *head != *standData.Head {
 	// 	fmt.Println("standData head", standData.Head)
