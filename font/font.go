@@ -66,7 +66,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	// tables content
 	tables := new(Tables)
 	if existHead {
-		tables.Head = GetHead(fileByte[headInfo.Offset : headInfo.Offset+headInfo.Length])
+		tables.Head = GetHead(fileByte, int(headInfo.Offset))
 	}
 	if existMaxp {
 		tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])

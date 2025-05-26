@@ -73,25 +73,25 @@ type Head struct {
 	GlyphDataFormat    int16   `json:"glyphDataFormat"`
 }
 
-func GetHead(data []byte) *Head {
+func GetHead(data []byte, pos int) *Head {
 	return &Head{
-		getFixed(data[:4]),
-		getFixed(data[4:8]),
-		getUint32(data[8:12]),
-		getUint32(data[12:16]),
-		getUint16(data[16:18]),
-		getUint16(data[18:20]),
-		getLongDateTime(data[20:28]),
-		getLongDateTime(data[28:36]),
-		getFWord(data[36:38]),
-		getFWord(data[38:40]),
-		getFWord(data[40:42]),
-		getFWord(data[42:44]),
-		getUint16(data[44:46]),
-		getUint16(data[46:48]),
-		getInt16(data[48:50]),
-		getInt16(data[50:52]),
-		getInt16(data[52:54]),
+		getFixed(data[pos : pos+4]),
+		getFixed(data[pos+4 : pos+8]),
+		getUint32(data[pos+8 : pos+12]),
+		getUint32(data[pos+12 : pos+16]),
+		getUint16(data[pos+16 : pos+18]),
+		getUint16(data[pos+18 : pos+20]),
+		getLongDateTime(data[pos+20 : pos+28]),
+		getLongDateTime(data[pos+28 : pos+36]),
+		getFWord(data[pos+36 : pos+38]),
+		getFWord(data[pos+38 : pos+40]),
+		getFWord(data[pos+40 : pos+42]),
+		getFWord(data[pos+42 : pos+44]),
+		getUint16(data[pos+44 : pos+46]),
+		getUint16(data[pos+46 : pos+48]),
+		getInt16(data[pos+48 : pos+50]),
+		getInt16(data[pos+50 : pos+52]),
+		getInt16(data[pos+52 : pos+54]),
 	}
 }
 
