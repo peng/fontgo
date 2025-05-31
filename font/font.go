@@ -69,7 +69,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		tables.Head = GetHead(fileByte, int(headInfo.Offset))
 	}
 	if existMaxp {
-		tables.Maxp = GetMaxp(fileByte[maxpInfo.Offset : maxpInfo.Offset+maxpInfo.Length])
+		tables.Maxp = GetMaxp(fileByte, int(maxpInfo.Offset))
 	}
 	if existLoca && tables.Maxp != nil && tables.Head != nil {
 		tables.Loca = GetLoca(fileByte[locaInfo.Offset:locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
@@ -127,7 +127,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	directory.TableContent = tableContent
 	directory.Tables = tables
 	glyfStart := tableContent["glyf"].Offset
-	directory.Glyphs = GetGlyphs(fileByte[glyfStart:], tables.Loca)
+	directory.Glyphs = GetGlyphs(fileByte, int(glyfStart), tables.Loca, int(tables.Maxp.NumGlyphs))
 
 	return
 }

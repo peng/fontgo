@@ -146,8 +146,8 @@ type GlyphCompound struct {
 }
 
 type Glyphs struct {
-	Simples   []GlyphSimple
-	Compounds []GlyphCompound
+	Simples   []GlyphSimple   `json:"simples"`
+	Compounds []GlyphCompound `json:"compounds"`
 }
 
 const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
@@ -347,10 +347,10 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	return
 }
 
-func GetGlyphs(data []byte, loca []uint16) (glyphs *Glyphs) {
+func GetGlyphs(data []byte, pos int, loca []uint16, num int) (glyphs *Glyphs) {
 	glyphs = new(Glyphs)
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < num; i++ {
 
 		offset := int(loca[i])
 		nextOffset := int(loca[i+1])
@@ -391,24 +391,24 @@ type Maxp struct {
 	MaxComponentDepth     uint16
 }
 
-func GetMaxp(data []byte) *Maxp {
+func GetMaxp(data []byte, pos int) *Maxp {
 	maxp := new(Maxp)
-	maxp.Version = getVersion(data[0:4])
-	maxp.NumGlyphs = getUint16(data[4:6])
+	maxp.Version = getVersion(data[pos : pos+4])
+	maxp.NumGlyphs = getUint16(data[pos+4 : pos+6])
 	if maxp.Version == "1.0" {
-		maxp.MaxPoints = getUint16(data[6:8])
-		maxp.MaxContours = getUint16(data[8:10])
-		maxp.MaxComponentPoints = getUint16(data[10:12])
-		maxp.MaxComponentContours = getUint16(data[12:14])
-		maxp.MaxZones = getUint16(data[14:16])
-		maxp.MaxTwilightPoints = getUint16(data[16:18])
-		maxp.MaxStorage = getUint16(data[18:20])
-		maxp.MaxFunctionDefs = getUint16(data[20:22])
-		maxp.MaxInstructionDefs = getUint16(data[22:24])
-		maxp.MaxStackElements = getUint16(data[24:26])
-		maxp.MaxSizeOfInstructions = getUint16(data[26:28])
-		maxp.MaxComponentElements = getUint16(data[28:30])
-		maxp.MaxComponentDepth = getUint16(data[30:32])
+		maxp.MaxPoints = getUint16(data[pos+6 : pos+8])
+		maxp.MaxContours = getUint16(data[pos+8 : pos+10])
+		maxp.MaxComponentPoints = getUint16(data[pos+10 : pos+12])
+		maxp.MaxComponentContours = getUint16(data[pos+12 : pos+14])
+		maxp.MaxZones = getUint16(data[pos+14 : pos+16])
+		maxp.MaxTwilightPoints = getUint16(data[pos+16 : pos+18])
+		maxp.MaxStorage = getUint16(data[pos+18 : pos+20])
+		maxp.MaxFunctionDefs = getUint16(data[pos+20 : pos+22])
+		maxp.MaxInstructionDefs = getUint16(data[pos+22 : pos+24])
+		maxp.MaxStackElements = getUint16(data[pos+24 : pos+26])
+		maxp.MaxSizeOfInstructions = getUint16(data[pos+26 : pos+28])
+		maxp.MaxComponentElements = getUint16(data[pos+28 : pos+30])
+		maxp.MaxComponentDepth = getUint16(data[pos+30 : pos+32])
 	}
 
 	return maxp
