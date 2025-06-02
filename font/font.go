@@ -13,7 +13,7 @@ type TagItem struct {
 type Tables struct {
 	Head *Head      `json:"head"`
 	Maxp *Maxp      `json:"maxp`
-	Loca []uint16   `json:"loca"`
+	Loca []int      `json:"loca"`
 	Cmap *Cmap      `json:"cmap,omitempty"`
 	Name *NameTable `json:"name,omitempty"`
 	Hhea *Hhea      `json:"hhea,omitempty"`
@@ -72,7 +72,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		tables.Maxp = GetMaxp(fileByte, int(maxpInfo.Offset))
 	}
 	if existLoca && tables.Maxp != nil && tables.Head != nil {
-		tables.Loca = GetLoca(fileByte[locaInfo.Offset:locaInfo.Offset+locaInfo.Length], tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
+		tables.Loca = GetLoca(fileByte, int(locaInfo.Offset), tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
 	}
 	if existCmap && tables.Maxp != nil {
 		tables.Cmap, err = GetCmap(fileByte[cmapInfo.Offset:cmapInfo.Offset+cmapInfo.Length], int(cmapInfo.Offset), int(tables.Maxp.NumGlyphs))

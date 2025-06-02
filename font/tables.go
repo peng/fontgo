@@ -347,13 +347,13 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	return
 }
 
-func GetGlyphs(data []byte, pos int, loca []uint16, num int) (glyphs *Glyphs) {
+func GetGlyphs(data []byte, pos int, loca []int, num int) (glyphs *Glyphs) {
 	glyphs = new(Glyphs)
 
 	for i := 0; i < num; i++ {
 
-		offset := int(loca[i])
-		nextOffset := int(loca[i+1])
+		offset := loca[i]
+		nextOffset := loca[i+1]
 		// fmt.Printf("innoffset %v", offset)
 		// fmt.Printf("innnextoffset %v", nextOffset)
 		numberOfContours := getInt16(data[offset : offset+2])
@@ -414,18 +414,28 @@ func GetMaxp(data []byte, pos int) *Maxp {
 	return maxp
 }
 
-func GetLoca(data []byte, numGlyphs uint16, indexToLocFormat int16) []uint16 {
+func GetLoca(data []byte, pos int, numGlyphs uint16, indexToLocFormat int16) (locations []int) {
 	// long version:  otf, ttf is different
-	var locations []uint16
-	pos := 0
-	for i := 0; i < int(numGlyphs)+1; i++ {
-		offset := getUint16(data[pos : pos+2])
+	offsetFn := func(data []byte, pos int) (offset int, nextPos int) {
+		size := 2
+		ratio := 2
 		if indexToLocFormat == 0 {
-			// 0 is short, 1 is long
-			offset *= 2
+			offset = int(getUint16(data[pos:pos+size])) * ratio
+			nextPos = pos + size
+			return
 		}
+		size = 4
+		ratio = 1
+		offset = int(getUint32(data[pos:pos+size])) * ratio
+		nextPos = pos + size
+		return
+	}
+	var (
+		offset int
+	)
+	for i := 0; i < int(numGlyphs); i++ {
+		offset, pos = offsetFn(data, pos)
 		locations = append(locations, offset)
-		pos += 2
 	}
 
 	return locations

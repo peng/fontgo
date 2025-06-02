@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -245,5 +246,27 @@ func TestAllTable(t *testing.T) {
 	}
 
 	// check local table
-	// standLocal := &
+	locaInfo := tableContent["loca"]
+	loca := GetLoca(fileByte, int(locaInfo.Offset), maxp.NumGlyphs, head.IndexToLocFormat)
+
+	sLoca := map[int]int{
+		0:     0,
+		1:     0,
+		2:     0,
+		20:    34836,
+		30:    60384,
+		500:   1106272,
+		1000:  2068516,
+		10960: 16572436, // lastest
+	}
+
+	for key, val := range sLoca {
+		if loca[key] != val {
+			fmt.Println("standData local "+strconv.Itoa(key), val)
+			fmt.Println("local "+strconv.Itoa(key), loca[:21])
+			t.Log("local error")
+			t.Fail()
+			return
+		}
+	}
 }
