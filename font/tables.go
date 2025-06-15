@@ -152,16 +152,16 @@ type Glyphs struct {
 
 const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
-func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
+func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	simple = new(GlyphSimple)
 	simple.Type = GLYPH_TYPE_SIMPLE
-	simple.NumberOfContours = getInt16(data[0:2])
-	simple.XMin = getFWord(data[2:4])
-	simple.YMin = getFWord(data[4:6])
-	simple.XMax = getFWord(data[6:8])
-	simple.YMax = getFWord(data[8:10])
+	simple.NumberOfContours = getInt16(data[pos : pos+2])
+	simple.XMin = getFWord(data[pos+2 : pos+4])
+	simple.YMin = getFWord(data[pos+4 : pos+6])
+	simple.XMax = getFWord(data[pos+6 : pos+8])
+	simple.YMax = getFWord(data[pos+8 : pos+10])
 
-	pos = 10
+	pos += 10
 	// get endPtsOfContours
 	for i := 0; i < int(simple.NumberOfContours); i++ {
 		simple.EndPtsOfContours = append(simple.EndPtsOfContours, getUint16(data[pos:pos+2]))
@@ -251,7 +251,7 @@ func GetGlyphSimple(data []byte) (simple *GlyphSimple, pos int) {
 	return
 }
 
-func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
+func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 	compound = new(GlyphCompound)
 	compound.Type = GLYPH_TYPE_COMPOUND
 	const (
@@ -268,14 +268,14 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	)
 
 	compound.Type = GLYPH_TYPE_COMPOUND
-	compound.NumberOfContours = getInt16(data[0:2])
-	compound.XMin = getFWord(data[2:4])
-	compound.YMin = getFWord(data[4:6])
-	compound.XMax = getFWord(data[6:8])
-	compound.YMax = getFWord(data[8:10])
+	compound.NumberOfContours = getInt16(data[pos : pos+2])
+	compound.XMin = getFWord(data[pos+2 : pos+4])
+	compound.YMin = getFWord(data[pos+4 : pos+6])
+	compound.XMax = getFWord(data[pos+6 : pos+8])
+	compound.YMax = getFWord(data[pos+8 : pos+10])
 
 	var flags uint16
-	pos = 10
+	pos += 10
 
 	moreComponent := true
 
@@ -347,27 +347,26 @@ func GetGlyphCompound(data []byte) (compound *GlyphCompound, pos int) {
 	return
 }
 
-func GetGlyphs(data []byte, pos int, loca []int, num int) (glyphs *Glyphs) {
+func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs) {
 	glyphs = new(Glyphs)
 
-	for i := 0; i < num; i++ {
+	for i := 0; i < numGlyphs; i++ {
 
 		offset := loca[i]
-		nextOffset := loca[i+1]
 		// fmt.Printf("innoffset %v", offset)
 		// fmt.Printf("innnextoffset %v", nextOffset)
-		numberOfContours := getInt16(data[offset : offset+2])
+		inPos := offset + pos
+		numberOfContours := getInt16(data[inPos : inPos+2])
 
-		if offset != nextOffset {
-			if numberOfContours >= 0 {
-				// simple
-				simp, _ := GetGlyphSimple(data[offset:])
-				glyphs.Simples = append(glyphs.Simples, *simp)
-			} else {
-				// compound
-				compound, _ := GetGlyphCompound(data[offset:])
-				glyphs.Compounds = append(glyphs.Compounds, *compound)
-			}
+		if numberOfContours >= 0 {
+			// fmt.Println("numberOfContours", numberOfContours)
+			// simple
+			simp := GetGlyphSimple(data, inPos)
+			glyphs.Simples = append(glyphs.Simples, *simp)
+		} else {
+			// compound
+			compound := GetGlyphCompound(data, inPos)
+			glyphs.Compounds = append(glyphs.Compounds, *compound)
 		}
 	}
 	return
