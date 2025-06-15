@@ -269,4 +269,20 @@ func TestAllTable(t *testing.T) {
 			return
 		}
 	}
+
+	// check glyph table
+	glyphInfo := tableContent["glyf"]
+	glyphs := GetGlyphs(fileByte, int(glyphInfo.Offset), loca, int(maxp.NumGlyphs))
+	if len(glyphs.Compounds) != 0 {
+		t.Log("glyphs Compounds len error", len(glyphs.Compounds))
+		t.Fail()
+		return
+	}
+
+	if len(glyphs.Simples) != 10961 {
+		t.Log("glyphs Simples len error")
+		t.Fail()
+		return
+	}
+
 }
