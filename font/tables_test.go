@@ -285,4 +285,81 @@ func TestAllTable(t *testing.T) {
 		return
 	}
 
+	type SGlyphSimple struct {
+		GlyphCommon
+		EndPtsOfContours []uint16 `json:"endPtsOfContours"`
+	}
+
+	type SPoint struct {
+		X int
+		Y int
+	}
+
+	simp1 := glyphs.Simples[0]
+	sSimp1 := SGlyphSimple{
+		GlyphCommon: GlyphCommon{
+			NumberOfContours: 4,
+			XMin:             279,
+			YMin:             -56,
+			XMax:             1221,
+			YMax:             1354,
+			Type:             "simple",
+		},
+		EndPtsOfContours: []uint16{58, 169, 173, 193},
+	}
+
+	if !reflect.DeepEqual(simp1.GlyphCommon, sSimp1.GlyphCommon) {
+		fmt.Println("standData glyph simple GlyphCommon", sSimp1.GlyphCommon)
+		fmt.Println("glyph simple GlyphCommon", simp1.GlyphCommon)
+		t.Log("glyph simple GlyphCommon error")
+		t.Fail()
+		return
+	}
+
+	if !reflect.DeepEqual(simp1.EndPtsOfContours, sSimp1.EndPtsOfContours) {
+		fmt.Println("standData glyph simple EndPtsOfContours", sSimp1.EndPtsOfContours)
+		fmt.Println("glyph simple EndPtsOfContours", simp1.EndPtsOfContours)
+		t.Log("glyph simple EndPtsOfContours error")
+		t.Fail()
+		return
+	}
+
+	// check point
+	if len(simp1.Points) != 193 {
+		fmt.Println("glyph simple point length", len(simp1.Points))
+		t.Log("glyph simple points length error")
+		t.Fail()
+		return
+	}
+
+	sPoints1 := map[int]SPoint{
+		0: SPoint{
+			X: 597,
+			Y: 1354,
+		},
+		10: SPoint{
+			X: 741,
+			Y: 1240,
+		},
+		120: SPoint{
+			X: 627,
+			Y: -56,
+		},
+		144: SPoint{
+			X: 483,
+			Y: 490,
+		},
+	}
+
+	for key, val := range sPoints1 {
+		p := simp1.Points[key]
+		if p.X != val.X || p.Y != val.Y {
+			fmt.Println("glyph simple point index", key)
+			fmt.Println("glyph simple point source", val)
+			fmt.Println("glyph simple point", p)
+			t.Log("glyph simple points error")
+			t.Fail()
+			return
+		}
+	}
 }

@@ -154,16 +154,16 @@ const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
 func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	simple = new(GlyphSimple)
-	simple.Type = GLYPH_TYPE_SIMPLE
-	simple.NumberOfContours = getInt16(data[pos : pos+2])
-	simple.XMin = getFWord(data[pos+2 : pos+4])
-	simple.YMin = getFWord(data[pos+4 : pos+6])
-	simple.XMax = getFWord(data[pos+6 : pos+8])
-	simple.YMax = getFWord(data[pos+8 : pos+10])
+	simple.GlyphCommon.Type = GLYPH_TYPE_SIMPLE
+	simple.GlyphCommon.NumberOfContours = getInt16(data[pos : pos+2])
+	simple.GlyphCommon.XMin = getFWord(data[pos+2 : pos+4])
+	simple.GlyphCommon.YMin = getFWord(data[pos+4 : pos+6])
+	simple.GlyphCommon.XMax = getFWord(data[pos+6 : pos+8])
+	simple.GlyphCommon.YMax = getFWord(data[pos+8 : pos+10])
 
 	pos += 10
 	// get endPtsOfContours
-	for i := 0; i < int(simple.NumberOfContours); i++ {
+	for i := 0; i < int(simple.GlyphCommon.NumberOfContours); i++ {
 		simple.EndPtsOfContours = append(simple.EndPtsOfContours, getUint16(data[pos:pos+2]))
 		pos += 2
 	}
@@ -177,7 +177,7 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	}
 
 	// get points num
-	pointsNum := int(simple.EndPtsOfContours[0])
+	pointsNum := int(simple.EndPtsOfContours[len(simple.EndPtsOfContours)-1])
 
 	for _, num := range simple.EndPtsOfContours {
 		contoursNum := int(num)
