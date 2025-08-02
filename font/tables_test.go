@@ -1,6 +1,7 @@
 package font
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -325,38 +326,194 @@ func TestAllTable(t *testing.T) {
 	}
 
 	// check point
-	if len(simp1.Points) != 193 {
+	if len(simp1.Points) != 194 {
 		fmt.Println("glyph simple point length", len(simp1.Points))
 		t.Log("glyph simple points length error")
 		t.Fail()
 		return
 	}
 
-	sPoints1 := map[int]SPoint{
-		0: SPoint{
+	sPoints1 := map[int]Point{
+		0: {
 			X: 597,
 			Y: 1354,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        false,
+				XShortVector: false,
+				YSame:        false,
+				YShortVector: false,
+			},
 		},
-		10: SPoint{
-			X: 741,
-			Y: 1240,
+		1: {
+			X: 66,
+			Y: -18,
+			Flag: &Flag{
+				OnCurve:      false,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        false,
+				YShortVector: true,
+			},
 		},
-		120: SPoint{
-			X: 627,
-			Y: -56,
+		2: {
+			X: 0,
+			Y: -18,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: false,
+				YSame:        false,
+				YShortVector: true,
+			},
 		},
-		144: SPoint{
-			X: 483,
-			Y: 490,
+		3: {
+			X: -6,
+			Y: -12,
+			Flag: &Flag{
+				OnCurve:      false,
+				Repeat:       false,
+				XSame:        false,
+				XShortVector: true,
+				YSame:        false,
+				YShortVector: true,
+			},
 		},
+		4: {
+			X: 0,
+			Y: -6,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: false,
+				YSame:        false,
+				YShortVector: true,
+			},
+		},
+		5: {
+			X: 12,
+			Y: -6,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        false,
+				YShortVector: true,
+			},
+		},
+		6: {
+			X: 2,
+			Y: 12,
+			Flag: &Flag{
+				OnCurve:      false,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        true,
+				YShortVector: true,
+			},
+		},
+		7: {
+			X: 10,
+			Y: 0,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       true,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        true,
+				YShortVector: false,
+			},
+		},
+		8: {
+			X: 6,
+			Y: 0,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       true,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        true,
+				YShortVector: false,
+			},
+		},
+		9: {
+			X: -6,
+			Y: -42,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        false,
+				XShortVector: true,
+				YSame:        false,
+				YShortVector: true,
+			},
+		},
+		10: {
+			X: 60,
+			Y: -24,
+			Flag: &Flag{
+				OnCurve:      false,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: true,
+				YSame:        false,
+				YShortVector: true,
+			},
+		},
+		120: {
+			X: -12,
+			Y: 0,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        false,
+				XShortVector: true,
+				YSame:        true,
+				YShortVector: false,
+			},
+		},
+		144: {
+			X: 0,
+			Y: 18,
+			Flag: &Flag{
+				OnCurve:      true,
+				Repeat:       false,
+				XSame:        true,
+				XShortVector: false,
+				YSame:        true,
+				YShortVector: true,
+			},
+		},
+	}
+
+	for key, val := range sPoints1 {
+		p := simp1.Points[key]
+		if !reflect.DeepEqual(p.Flag, val.Flag) {
+			fmt.Println("glyph simple point index", key)
+			b, _ := json.MarshalIndent(val.Flag, "", "  ")
+			fmt.Println("glyph simple point flag source", string(b))
+			pj, _ := json.MarshalIndent(p.Flag, "", "  ")
+			fmt.Println("glyph simple point flag", p, string(pj))
+			t.Log("glyph simple points error")
+			t.Fail()
+			return
+		}
 	}
 
 	for key, val := range sPoints1 {
 		p := simp1.Points[key]
 		if p.X != val.X || p.Y != val.Y {
 			fmt.Println("glyph simple point index", key)
-			fmt.Println("glyph simple point source", val)
-			fmt.Println("glyph simple point", p)
+			b, _ := json.MarshalIndent(val.Flag, "", "  ")
+			fmt.Println("glyph simple point source", val, string(b))
+			pj, _ := json.MarshalIndent(p.Flag, "", "  ")
+			fmt.Println("glyph simple point", p, string(pj))
 			t.Log("glyph simple points error")
 			t.Fail()
 			return

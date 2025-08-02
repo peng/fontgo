@@ -99,6 +99,7 @@ type Flag struct {
 	OnCurve      bool `json:"onCurve"`
 	XShortVector bool `json:"xShortVector`
 	YShortVector bool `json:"yShortVector"`
+	Repeat       bool `json:"repeat"`
 	XSame        bool `json:"xSame"`
 	YSame        bool `json:"ySave"`
 }
@@ -170,6 +171,7 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 
 	// get instructionLength
 	simple.InstructionLength = getUint16(data[pos : pos+2])
+	pos += 2
 	for i := 0; i < int(simple.InstructionLength); i++ {
 		simple.Instructions = append(simple.Instructions, getUint8(data[pos:pos+1]))
 		// test pos++
@@ -177,7 +179,7 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	}
 
 	// get points num
-	pointsNum := int(simple.EndPtsOfContours[len(simple.EndPtsOfContours)-1])
+	pointsNum := 0
 
 	for _, num := range simple.EndPtsOfContours {
 		contoursNum := int(num)
@@ -185,22 +187,29 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 			pointsNum = contoursNum
 		}
 	}
-
-	var flags []uint8
+	pointsNum += 1
+	var flags []*Flag
 
 	// get flags
 	for i := 0; i < pointsNum; i++ {
 		f := getUint8(data[pos : pos+1])
-		flags = append(flags, f)
+		flag := &Flag{
+			(f & 0x01) == 0x01,
+			(f & 0x02) == 0x02,
+			(f & 0x04) == 0x04,
+			(f & 0x08) == 0x08,
+			(f & 0x10) == 0x10,
+			(f & 0x20) == 0x20,
+		}
+		flags = append(flags, flag)
 		pos++
 
-		if f&0x08 == 1 {
+		if flag.Repeat {
 			repeatNum := int(getUint8(data[pos : pos+1]))
 			pos++
 
 			for j := 0; j < repeatNum; j++ {
-				flags = append(flags, getUint8(data[pos:pos+1]))
-				pos++
+				flags = append(flags, flag)
 			}
 			i += repeatNum
 		}
@@ -211,25 +220,26 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	// get x points
 	for i := 0; i < pointsNum; i++ {
 
-		flagBit := flags[i]
+		flag := flags[i]
 
-		flag := &Flag{
-			flagBit&0x01 == 1,
-			flagBit&0x02 == 1,
-			flagBit&0x04 == 1,
-			flagBit&0x10 == 1,
-			flagBit&0x20 == 1,
-		}
-
-		var point Point
+		var (
+			point Point
+			x     int
+		)
 		point.Flag = flag
 		if flag.XShortVector {
-			point.X = int(getUint8(data[pos : pos+1]))
+			x = int(getUint8(data[pos : pos+1]))
+			if !flag.XSame {
+				x *= -1
+			}
 			pos++
+		} else if flag.XSame {
+			x = 0
 		} else {
-			point.X = int(getUint16(data[pos : pos+2]))
+			x = int(getInt16(data[pos : pos+2]))
 			pos += 2
 		}
+		point.X = x
 
 		simple.Points = append(simple.Points, &point)
 	}
@@ -238,9 +248,15 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	for i := 0; i < pointsNum; i++ {
 		var y int
 		point := simple.Points[i]
-		if point.Flag.YShortVector {
+		flag := point.Flag
+		if flag.YShortVector {
 			y = int(getUint8(data[pos : pos+1]))
+			if !flag.YSame {
+				y *= -1
+			}
 			pos++
+		} else if flag.YSame {
+			y = 0
 		} else {
 			y = int(getUint16(data[pos : pos+2]))
 			pos += 2
