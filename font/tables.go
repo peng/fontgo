@@ -346,6 +346,8 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 		}
 		pos += 2
 
+		compound.Component = append(compound.Component, *component)
+
 		moreComponent = flags&MORE_COMPONENTS == 1
 	}
 
