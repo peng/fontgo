@@ -519,4 +519,260 @@ func TestAllTable(t *testing.T) {
 			return
 		}
 	}
+	// test GlyphCompound
+	fileByte2, err2 := os.ReadFile("../test/Changa-Regular.ttf")
+
+	if err2 != nil {
+		t.Log(err2)
+		t.Fail()
+		return
+	}
+
+	offsetTable2 := GetOffsetTable(fileByte2)
+	numTables2 := int(offsetTable2.NumTables)
+	tableContent2 := GetTableContent(numTables2, fileByte2)
+
+	maxpInfo2 := tableContent2["maxp"]
+	maxp2 := GetMaxp(fileByte2, int(maxpInfo2.Offset))
+
+	headInfo2 := tableContent2["head"]
+	head2 := GetHead(fileByte2, int(headInfo2.Offset))
+
+	locaInfo2 := tableContent2["loca"]
+	loca2 := GetLoca(fileByte2, int(locaInfo2.Offset), maxp2.NumGlyphs, head2.IndexToLocFormat)
+
+	glyphInfo2 := tableContent2["glyf"]
+	glyphs2 := GetGlyphs(fileByte2, int(glyphInfo2.Offset), loca2, int(maxp2.NumGlyphs))
+	if len(glyphs2.Compounds) != 448 {
+		t.Log("glyphs Compounds len error", len(glyphs.Compounds))
+		t.Fail()
+		return
+	}
+
+	if len(glyphs2.Compounds) != 448 {
+		t.Log("glyphs Simples len error")
+		t.Fail()
+		return
+	}
+
+	sCompound := map[int]GlyphCompound{
+		0: {
+			GlyphCommon: GlyphCommon{
+				NumberOfContours: -1,
+				XMin:             15,
+				YMin:             0,
+				XMax:             536,
+				YMax:             837,
+				Type:             "compound",
+			},
+			Component: []Component{
+				{
+					Flags:      34,
+					GlyphIndex: 789,
+					Argument1:  15,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      34,
+					GlyphIndex: 4,
+					Argument1:  0,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      263,
+					GlyphIndex: 717,
+					Argument1:  488,
+					Argument2:  125,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+			},
+			InstructionLength: 83,
+			Instructions: []uint8{
+				179, 27, 1, 2, 72, 75, 176, 50, 80, 88, 64, 26, 6, 1, 5, 0,
+				0, 1, 5, 0, 101, 0, 4, 4, 2, 93, 0, 2, 2, 37, 75, 3, 1, 1,
+				1, 38, 1, 76, 27, 64, 24, 0, 2, 0, 4, 5, 2, 4, 101, 6, 1, 5,
+				0, 0, 1, 5, 0, 101, 3, 1, 1, 1, 41, 1, 76, 89, 64, 14, 9, 9,
+				9, 12, 9, 12, 18, 17, 17, 17, 17, 7, 8, 36, 43,
+			},
+		},
+		5: {
+			GlyphCommon: GlyphCommon{
+				NumberOfContours: -1,
+				XMin:             15,
+				YMin:             0,
+				XMax:             536,
+				YMax:             792,
+				Type:             "compound",
+			},
+			Component: []Component{
+				{
+					Flags:      34,
+					GlyphIndex: 789,
+					Argument1:  15,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      34,
+					GlyphIndex: 4,
+					Argument1:  0,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      263,
+					GlyphIndex: 725,
+					Argument1:  475,
+					Argument2:  125,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+			},
+			InstructionLength: 104,
+			Instructions: []uint8{
+				75, 176, 50, 80, 88, 64, 35, 0, 6, 9, 1, 7, 2, 6, 7, 101,
+				8, 1, 5, 0, 0, 1, 5, 0, 101, 0, 4, 4, 2, 93, 0, 2,
+				2, 37, 75, 3, 1, 1, 1, 38, 1, 76, 27, 64, 33, 0, 6, 9,
+				1, 7, 2, 6, 7, 101, 0, 2, 0, 4, 5, 2, 4, 101, 8, 1,
+				5, 0, 0, 1, 5, 0, 101, 3, 1, 1, 1, 41, 1, 76, 89, 64,
+				22, 13, 13, 9, 9, 13, 22, 13, 21, 18, 16, 9, 12, 9, 12, 18,
+				17, 17, 17, 17, 10, 8, 36, 43,
+			},
+		},
+		45: {
+			GlyphCommon: GlyphCommon{
+				NumberOfContours: -1,
+				XMin:             95,
+				YMin:             -286,
+				XMax:             566,
+				YMax:             625,
+				Type:             "compound",
+			},
+			Component: []Component{
+				{
+					Flags:      34,
+					GlyphIndex: 789,
+					Argument1:  95,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      34,
+					GlyphIndex: 69,
+					Argument1:  0,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      259,
+					GlyphIndex: 727,
+					Argument1:  424,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+			},
+			InstructionLength: 63,
+			Instructions: []uint8{
+				180, 33, 20, 2, 4, 71, 75, 176, 50, 80, 88, 64, 18, 0, 4, 2,
+				4, 132, 1, 1, 0, 0, 37, 75, 3, 1, 2, 2, 38, 2, 76, 27,
+				64, 18, 0, 4, 2, 4, 132, 1, 1, 0, 0, 2, 93, 3, 1, 2,
+				2, 41, 2, 76, 89, 183, 39, 22, 17, 22, 17, 5, 8, 36, 43,
+			},
+		},
+		99: {
+			GlyphCommon: GlyphCommon{
+				NumberOfContours: -1,
+				XMin:             60,
+				YMin:             -15,
+				XMax:             655,
+				YMax:             700,
+				Type:             "compound",
+			},
+			Component: []Component{
+				{
+					Flags:      34,
+					GlyphIndex: 789,
+					Argument1:  60,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      34,
+					GlyphIndex: 152,
+					Argument1:  0,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+				{
+					Flags:      259,
+					GlyphIndex: 719,
+					Argument1:  650,
+					Argument2:  0,
+					Scale01:    0,
+					Scale10:    0,
+					Xscale:     16384,
+					Yscale:     16384,
+				},
+			},
+			InstructionLength: 180,
+			Instructions: []uint8{
+				64, 17, 31, 19, 1, 3, 2, 5, 44, 18, 2, 3, 2, 4, 1, 0,
+				4, 3, 74, 75, 176, 17, 80, 88, 64, 27, 0, 5, 5, 47, 75, 0,
+				3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 4, 4, 0, 95, 1, 1,
+				0, 0, 38, 0, 76, 27, 75, 176, 25, 80, 88, 64, 31, 0, 5, 5,
+				47, 75, 0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 4, 4, 0,
+				95, 1, 1, 0, 0, 38, 0, 76, 27, 64, 31, 0, 5, 2, 5, 131,
+				0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 0, 0, 38, 75, 0,
+				4, 4, 1, 95, 0, 1, 1, 46, 1, 76, 27, 64, 31, 0, 5, 2,
+				5, 131, 0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 0, 0, 41,
+				75, 0, 4, 4, 1, 95, 0, 1, 1, 49, 1, 76, 89, 89, 89, 64,
+				9, 41, 35, 36, 38, 35, 18, 6, 8, 37, 43,
+			},
+		},
+	}
+
+	// check InstructionLength
+	for ind, compound := range sCompound {
+		curComp := glyphs2.Compounds[ind]
+		if curComp.InstructionLength != compound.InstructionLength {
+			t.Log("glyphs compound InstructionLength error index:", ind)
+			t.Log("glyphs compound InstructionLength is: ", curComp.InstructionLength)
+			t.Fail()
+			return
+		}
+	}
 }
