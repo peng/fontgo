@@ -127,23 +127,23 @@ type GlyphSimple struct {
 }
 
 type Component struct {
-	Flags      uint16  `json:"flags"`
-	GlyphIndex uint16  `json:"glyphIndex"`
-	Argument1  int     `json:"argument1"`
-	Argument2  int     `json:"argument2"`
-	Unsign     bool    `json:"unsign"`
-	Scale      float32 `json:"scale"`
-	Xscale     float32 `json:"xscale"`
-	Yscale     float32 `json:"yscale"`
-	Scale01    float32 `json:"scale01"`
-	Scale10    float32 `json:"scale10"`
+	Flags      uint16 `json:"flags"`
+	GlyphIndex uint16 `json:"glyphIndex"`
+	Argument1  int    `json:"argument1"`
+	Argument2  int    `json:"argument2"`
+	// Unsign     bool    `json:"unsign"`
+	// Scale   float32 `json:"scale"`
+	Xscale  float32 `json:"xscale"`
+	Yscale  float32 `json:"yscale"`
+	Scale01 float32 `json:"scale01"`
+	Scale10 float32 `json:"scale10"`
 }
 
 type GlyphCompound struct {
 	GlyphCommon
-	Component         []Component
-	instructionLength int
-	instructions      []uint8
+	Component         []Component `json:"component"`
+	InstructionLength int         `json:"instructionLength"`
+	Instructions      []uint8     `json:"instructions"`
 }
 
 type Glyphs struct {
@@ -309,7 +309,7 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 				pos += 2
 				component.Argument2 = int(getInt16(data[pos : pos+2]))
 			} else {
-				component.Unsign = true
+				// component.Unsign = true
 				component.Argument1 = int(getUint16(data[pos : pos+2]))
 				pos += 2
 				component.Argument2 = int(getUint16(data[pos : pos+2]))
@@ -321,7 +321,7 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 				pos++
 				component.Argument2 = int(getInt8(data[pos : pos+1]))
 			} else {
-				component.Unsign = true
+				// component.Unsign = true
 				component.Argument1 = int(getUint8(data[pos : pos+1]))
 				pos++
 				component.Argument2 = int(getUint8(data[pos : pos+1]))
@@ -330,7 +330,9 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 		}
 
 		if flags&WE_HAVE_A_SCALE == 1 {
-			component.Scale = get2Dot14(data[pos : pos+2])
+			// component.Scale = get2Dot14(data[pos : pos+2])
+			component.Xscale = get2Dot14(data[pos : pos+2])
+			component.Yscale = component.Xscale
 		} else if flags&WE_HAVE_AN_X_AND_Y_SCALE == 1 {
 			component.Xscale = get2Dot14((data[pos : pos+2]))
 			pos += 2
@@ -353,11 +355,11 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 
 	// can't understand
 	if flags&WE_HAVE_INSTRUCTIONS == 1 {
-		compound.instructionLength = int(getUint16(data[pos : pos+2]))
+		compound.InstructionLength = int(getUint16(data[pos : pos+2]))
 		pos += 2
 
-		for i := 0; i < compound.instructionLength; i++ {
-			compound.instructions = append(compound.instructions, getUint8(data[pos:pos+1]))
+		for i := 0; i < compound.InstructionLength; i++ {
+			compound.Instructions = append(compound.Instructions, getUint8(data[pos:pos+1]))
 			pos++
 		}
 	}
