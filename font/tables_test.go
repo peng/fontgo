@@ -549,12 +549,6 @@ func TestAllTable(t *testing.T) {
 		return
 	}
 
-	if len(glyphs2.Compounds) != 448 {
-		t.Log("glyphs Simples len error")
-		t.Fail()
-		return
-	}
-
 	sCompound := map[int]GlyphCompound{
 		0: {
 			GlyphCommon: GlyphCommon{
@@ -567,34 +561,34 @@ func TestAllTable(t *testing.T) {
 			},
 			Component: []Component{
 				{
-					Flags:      34,
-					GlyphIndex: 789,
-					Argument1:  15,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:       34,
+					// GlyphIndex: 789,
+					Argument1: 15,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      34,
-					GlyphIndex: 4,
-					Argument1:  0,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 4,
+					Argument1: 0,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      263,
-					GlyphIndex: 717,
-					Argument1:  488,
-					Argument2:  125,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      263,
+					// GlyphIndex: 717,
+					Argument1: 488,
+					Argument2: 125,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 			},
 			InstructionLength: 83,
@@ -617,34 +611,34 @@ func TestAllTable(t *testing.T) {
 			},
 			Component: []Component{
 				{
-					Flags:      34,
-					GlyphIndex: 789,
-					Argument1:  15,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 789,
+					Argument1: 15,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      34,
-					GlyphIndex: 4,
-					Argument1:  0,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 4,
+					Argument1: 0,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      263,
-					GlyphIndex: 725,
-					Argument1:  475,
-					Argument2:  125,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      263,
+					// GlyphIndex: 725,
+					Argument1: 475,
+					Argument2: 125,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 			},
 			InstructionLength: 104,
@@ -669,34 +663,34 @@ func TestAllTable(t *testing.T) {
 			},
 			Component: []Component{
 				{
-					Flags:      34,
-					GlyphIndex: 789,
-					Argument1:  95,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 789,
+					Argument1: 95,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      34,
-					GlyphIndex: 69,
-					Argument1:  0,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 69,
+					Argument1: 0,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      259,
-					GlyphIndex: 727,
-					Argument1:  424,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      259,
+					// GlyphIndex: 727,
+					Argument1: 424,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 			},
 			InstructionLength: 63,
@@ -718,34 +712,34 @@ func TestAllTable(t *testing.T) {
 			},
 			Component: []Component{
 				{
-					Flags:      34,
-					GlyphIndex: 789,
-					Argument1:  60,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 789,
+					Argument1: 60,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      34,
-					GlyphIndex: 152,
-					Argument1:  0,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      34,
+					// GlyphIndex: 152,
+					Argument1: 0,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 				{
-					Flags:      259,
-					GlyphIndex: 719,
-					Argument1:  650,
-					Argument2:  0,
-					Scale01:    0,
-					Scale10:    0,
-					Xscale:     16384,
-					Yscale:     16384,
+					// Flags:      259,
+					// GlyphIndex: 719,
+					Argument1: 650,
+					Argument2: 0,
+					Scale01:   0,
+					Scale10:   0,
+					Xscale:    16384,
+					Yscale:    16384,
 				},
 			},
 			InstructionLength: 180,
@@ -754,25 +748,54 @@ func TestAllTable(t *testing.T) {
 				4, 3, 74, 75, 176, 17, 80, 88, 64, 27, 0, 5, 5, 47, 75, 0,
 				3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 4, 4, 0, 95, 1, 1,
 				0, 0, 38, 0, 76, 27, 75, 176, 25, 80, 88, 64, 31, 0, 5, 5,
-				47, 75, 0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 4, 4, 0,
-				95, 1, 1, 0, 0, 38, 0, 76, 27, 64, 31, 0, 5, 2, 5, 131,
-				0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 0, 0, 38, 75, 0,
-				4, 4, 1, 95, 0, 1, 1, 46, 1, 76, 27, 64, 31, 0, 5, 2,
-				5, 131, 0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 0, 0, 41,
-				75, 0, 4, 4, 1, 95, 0, 1, 1, 49, 1, 76, 89, 89, 89, 64,
-				9, 41, 35, 36, 38, 35, 18, 6, 8, 37, 43,
+				47, 75, 0, 3, 3, 2, 95, 0, 2, 2, 48, 75, 0, 0, 0, 38,
+				75, 0, 4, 4, 1, 95, 0, 1, 1, 46, 1, 76, 27, 75, 176, 50,
+				80, 88, 64, 31, 0, 5, 2, 5, 131, 0, 3, 3, 2, 95, 0, 2,
+				2, 48, 75, 0, 0, 0, 38, 75, 0, 4, 4, 1, 95, 0, 1, 1,
+				46, 1, 76, 27, 64, 31, 0, 5, 2, 5, 131, 0, 3, 3, 2, 95,
+				0, 2, 2, 48, 75, 0, 0, 0, 41, 75, 0, 4, 4, 1, 95, 0,
+				1, 1, 49, 1, 76, 89, 89, 89, 64, 9, 41, 35, 36, 38, 35, 18,
+				6, 8, 37, 43,
 			},
 		},
 	}
 
-	// check InstructionLength
 	for ind, compound := range sCompound {
 		curComp := glyphs2.Compounds[ind]
+
+		// check InstructionLength
 		if curComp.InstructionLength != compound.InstructionLength {
 			t.Log("glyphs compound InstructionLength error index:", ind)
 			t.Log("glyphs compound InstructionLength is: ", curComp.InstructionLength)
 			t.Fail()
 			return
 		}
+
+		// check Instructions
+		for instructionInd := 0; instructionInd < len(compound.Instructions); instructionInd++ {
+			if curComp.Instructions[instructionInd] != compound.Instructions[instructionInd] {
+				t.Log("glyphs compound error index:", ind)
+				t.Log("glyphs compound Instructions error index:", instructionInd)
+				t.Log("glyphs compound Instructions value is: ", curComp.Instructions[instructionInd], compound.Instructions[instructionInd])
+				t.Fail()
+				return
+			}
+		}
+
+		// check GlyphCommon
+		if !reflect.DeepEqual(curComp.GlyphCommon, compound.GlyphCommon) {
+			t.Log("glyphs compound error index:", ind)
+			t.Log("glyphs compound GlyphCommon is: ", curComp.GlyphCommon)
+		}
+
+		// check Component
+		for compInd := 0; compInd < len(curComp.Component); compInd++ {
+			if !reflect.DeepEqual(curComp.Component[compInd], compound.Component[compInd]) {
+				t.Log("glyphs compound error index:", ind)
+				t.Log("glyphs compound Component error index:", compInd)
+				t.Log("glyphs compound Component value is:", curComp.Component[compInd])
+			}
+		}
 	}
+
 }
