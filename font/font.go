@@ -75,7 +75,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		tables.Loca = GetLoca(fileByte, int(locaInfo.Offset), tables.Maxp.NumGlyphs, tables.Head.IndexToLocFormat)
 	}
 	if existCmap && tables.Maxp != nil {
-		tables.Cmap, err = GetCmap(fileByte[cmapInfo.Offset:cmapInfo.Offset+cmapInfo.Length], int(cmapInfo.Offset), int(tables.Maxp.NumGlyphs))
+		tables.Cmap, err = GetCmap(fileByte, int(cmapInfo.Offset), int(tables.Maxp.NumGlyphs))
 	}
 
 	if existName {
