@@ -756,10 +756,9 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 	return
 }
 
-func GetCmap(data []byte, prevPos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
-	pos := 0
+func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 	cmap = new(Cmap)
-	cmap.Version = getUint16(data[0 : pos+2])
+	cmap.Version = getUint16(data[pos : pos+2])
 	pos += 2
 	cmap.NumberSubtables = getUint16(data[pos : pos+2])
 	pos += 2
@@ -893,7 +892,7 @@ func GetCmap(data []byte, prevPos int, maxpNumGlyphs int) (cmap *Cmap, err error
 			}
 			subTable["idRangeOffset"] = idRangeOffset
 
-			subTable["glyphIndexArrayOffset"] = pos + prevPos
+			subTable["glyphIndexArrayOffset"] = pos
 
 			// The remaining is glyphIndexArray length
 			glyphLen := (subTable["length"].(int) - (pos - startPos)) / 2
