@@ -798,4 +798,17 @@ func TestAllTable(t *testing.T) {
 		}
 	}
 
+	// check cmap
+	cmapInfo := tableContent["cmap"]
+	cmap, cmapErr := GetCmap(fileByte, int(cmapInfo.Offset), int(maxp.NumGlyphs))
+	if cmapErr != nil {
+		t.Log(cmapErr)
+		t.Fail()
+		return
+	}
+
+	if len(cmap.SubTables) != 3 {
+		t.Log("cmap subTables length error, error length is ", len(cmap.SubTables))
+		t.Fail()
+	}
 }
