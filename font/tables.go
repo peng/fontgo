@@ -580,6 +580,8 @@ type CmapFormatNonDefaultUVS struct {
 }
 
 func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (code map[int]int, err error) {
+	code = make(map[int]int)
+
 	var format0, format2, format4, format12, format14 map[string]interface{}
 
 	for _, val := range subTables {
@@ -587,7 +589,7 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 		platformIDSource, exist2 := val["platformID"]
 		platformSpecificIDSource, exist3 := val["platformSpecificID"]
 
-		if !exist || !exist2 || exist3 {
+		if !exist || !exist2 || !exist3 {
 			err = errors.New("Read platformID or platformSpecificID error")
 			return
 		}
@@ -767,7 +769,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 		subTable := make(map[string]interface{})
 		subTable["platformID"] = int(getUint16(data[pos : pos+2]))
 		pos += 2
-		subTable["platformSpecificID"] = getUint16(data[pos : pos+2])
+		subTable["platformSpecificID"] = int(getUint16(data[pos : pos+2]))
 		pos += 2
 		subTable["offset"] = getUint32(data[pos : pos+4])
 		pos += 4
@@ -782,7 +784,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			return
 		}
 		if format == 0 {
-			subTable["length"] = getUint16(data[pos : pos+2])
+			subTable["length"] = int(getUint16(data[pos : pos+2]))
 			pos += 2
 			subTable["language"] = getUint16(data[pos : pos+2])
 			pos += 2
@@ -1060,8 +1062,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 
 			subTable["groups"] = groups
 		} else {
-			err = errors.New("format not support!")
-			return
+			println("Warning: format " + strconv.Itoa(format) + " not support!")
 		}
 		cmap.SubTables = append(cmap.SubTables, subTable)
 	}
