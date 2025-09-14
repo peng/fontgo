@@ -811,4 +811,104 @@ func TestAllTable(t *testing.T) {
 		t.Log("cmap subTables length error, error length is ", len(cmap.SubTables))
 		t.Fail()
 	}
+
+	if cmap.NumberSubtables != 3 {
+		t.Log("cmap NumberSubtables error, NumberSubtables is ", cmap.NumberSubtables)
+		t.Fail()
+	}
+
+	if cmap.Version != 0 {
+		t.Log("cmap Version error, Version is ", cmap.NumberSubtables)
+		t.Fail()
+	}
+
+	// check cmap format 4
+	cmapSubTable0 := cmap.SubTables[0]
+	if cmapSubTable0["platformID"].(int) != 0 {
+		t.Log("cmap subTable 0 platformID error, platformID is ", cmapSubTable0["platformID"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable0["platformSpecificID"].(int) != 3 {
+		t.Log("cmap subTable 0 platformSpecificID error, platformSpecificID is ", cmapSubTable0["platformSpecificID"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable0["offset"].(uint32) != 28 {
+		t.Log("cmap subTable 0 offset error, offset is ", cmapSubTable0["offset"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable0["format"].(int) != 4 {
+		t.Log("cmap subTablfe 0 format error, format is ", cmapSubTable0["format"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable0["length"].(int) != 54298 {
+		t.Log("cmap subTablfe 0 length error, length is ", cmapSubTable0["length"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable0["language"].(uint16) != 0 {
+		t.Log("cmap subTablfe 0 language error, language is ", cmapSubTable0["language"].(uint16))
+		t.Fail()
+	}
+
+	if cmapSubTable0["segCountX2"].(uint16) != 9486 {
+		t.Log("cmap subTablfe 0 segCountX2 error, segCountX2 is ", cmapSubTable0["segCountX2"].(uint16))
+		t.Fail()
+	}
+
+	if cmapSubTable0["searchRange"].(uint16) != 8192 {
+		t.Log("cmap subTablfe 0 searchRange error, searchRange is ", cmapSubTable0["searchRange"].(uint16))
+		t.Fail()
+	}
+
+	if cmapSubTable0["entrySelector"].(uint16) != 12 {
+		t.Log("cmap subTablfe 0 entrySelector error, entrySelector is ", cmapSubTable0["entrySelector"].(uint16))
+		t.Fail()
+	}
+
+	if cmapSubTable0["rangeShift"].(uint16) != 1294 {
+		t.Log("cmap subTablfe 0 rangeShift error, rangeShift is ", cmapSubTable0["rangeShift"].(uint16))
+		t.Fail()
+	}
+	// check cmap format endCode slice
+	cmapSubTable0endCode := map[int]uint16{
+		0:    0,
+		1:    29,
+		99:   20186,
+		2321: 29822,
+		4741: 65509,
+		4742: 65535,
+	}
+	for ind, val := range cmapSubTable0endCode {
+		endCode := cmapSubTable0["endCode"].([]uint16)
+		if endCode[ind] != val {
+			t.Log("cmap subTablfe 0 endCode error, endCode index and value is ", ind, endCode[ind], val)
+			t.Fail()
+		}
+	}
+
+	if cmapSubTable0["reservedPad"].(uint16) != 0 {
+		t.Log("cmap subTablfe 0 reservedPad error, reservedPad is ", cmapSubTable0["reservedPad"].(uint16))
+		t.Fail()
+	}
+
+	// check cmap format 0
+	cmapSubTable1 := cmap.SubTables[1]
+	if cmapSubTable1["platformID"].(int) != 1 {
+		t.Log("cmap subTable 1 platformID error, platformID is ", cmapSubTable1["platformID"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable1["platformSpecificID"].(int) != 0 {
+		t.Log("cmap subTable 1 platformSpecificID error, platformSpecificID is ", cmapSubTable1["platformSpecificID"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable1["offset"].(uint32) != 54326 {
+		t.Log("cmap subTable 1 offset error, offset is ", cmapSubTable1["offset"].(uint32))
+		t.Fail()
+	}
 }
