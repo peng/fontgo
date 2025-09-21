@@ -804,7 +804,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["glyphIndexArray"] = glyphIndexArray
 
 		} else if format == 2 {
-			subTable["length"] = getUint16(data[curPos : curPos+2])
+			subTable["length"] = int(getUint16(data[curPos : curPos+2]))
 			curPos += 2
 			subTable["language"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
@@ -851,7 +851,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["glyphIndexArray"] = glyphIndexArray
 
 		} else if format == 4 {
-			subTable["length"] = getUint16(data[curPos : curPos+2])
+			subTable["length"] = int(getUint16(data[curPos : curPos+2]))
 			curPos += 2
 			subTable["language"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
@@ -877,14 +877,14 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 
 			var startCode []uint16
 			for i := 0; i < segCount; i++ {
-				startCode = append(startCode, getUint16(data[0:curPos+2]))
+				startCode = append(startCode, getUint16(data[curPos:curPos+2]))
 				curPos += 2
 			}
 			subTable["startCode"] = startCode
 
 			var idDelta []uint16
 			for i := 0; i < segCount; i++ {
-				idDelta = append(idDelta, getUint16(data[0:2]))
+				idDelta = append(idDelta, getUint16(data[curPos:curPos+2]))
 				curPos += 2
 			}
 			subTable["idDelta"] = idDelta
@@ -899,7 +899,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["glyphIndexArrayOffset"] = curPos
 
 			// The remaining is glyphIndexArray length
-			glyphLen := (int(subTable["length"].(uint16)) - (curPos - startPos)) / 2
+			glyphLen := (subTable["length"].(int) - (curPos - startPos)) / 2
 			var glyphIndexArray []uint16
 			for i := 0; i < glyphLen; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint16(data[curPos:curPos+2]))
@@ -908,7 +908,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["glyphIndexArray"] = glyphIndexArray
 
 		} else if format == 6 {
-			subTable["length"] = getUint16(data[curPos : curPos+2])
+			subTable["length"] = int(getUint16(data[curPos : curPos+2]))
 			curPos += 2
 			subTable["language"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
@@ -927,7 +927,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 		} else if format == 8 {
 			subTable["reserved"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
-			subTable["length"] = getUint32(data[curPos : curPos+4])
+			subTable["length"] = int(getUint32(data[curPos : curPos+4]))
 			curPos += 4
 			subTable["language"] = getUint32(data[curPos : curPos+4])
 			curPos += 4
@@ -956,7 +956,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 		} else if format == 10 {
 			subTable["reserved"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
-			subTable["length"] = getUint32(data[curPos : curPos+4])
+			subTable["length"] = int(getUint32(data[curPos : curPos+4]))
 			curPos += 4
 			subTable["language"] = getUint32(data[curPos : curPos+4])
 			curPos += 4
@@ -975,7 +975,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 		} else if format == 12 || format == 13 {
 			subTable["reserved"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
-			subTable["length"] = getUint32(data[curPos : curPos+4])
+			subTable["length"] = int(getUint32(data[curPos : curPos+4]))
 			curPos += 4
 			subTable["language"] = getUint32(data[curPos : curPos+4])
 			curPos += 4
@@ -995,7 +995,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["groups"] = groups
 
 		} else if format == 14 {
-			subTable["length"] = getUint32(data[curPos : curPos+4])
+			subTable["length"] = int(getUint32(data[curPos : curPos+4]))
 			curPos += 4
 			subTable["numVarSelectorRecords"] = getUint32(data[curPos : curPos+4])
 			curPos += 4
