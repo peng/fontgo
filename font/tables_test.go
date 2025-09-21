@@ -873,7 +873,7 @@ func TestAllTable(t *testing.T) {
 		t.Log("cmap subTablfe 0 rangeShift error, rangeShift is ", cmapSubTable0["rangeShift"].(uint16))
 		t.Fail()
 	}
-	// check cmap format endCode slice
+	// check cmap format 4 endCode slice
 	cmapSubTable0endCode := map[int]uint16{
 		0:    0,
 		1:    29,
@@ -893,6 +893,69 @@ func TestAllTable(t *testing.T) {
 	if cmapSubTable0["reservedPad"].(uint16) != 0 {
 		t.Log("cmap subTablfe 0 reservedPad error, reservedPad is ", cmapSubTable0["reservedPad"].(uint16))
 		t.Fail()
+	}
+
+	// check format 4 startCode slice
+	cmapSubtable0StartCode := map[int]uint16{
+		0:    0,
+		44:   8804,
+		1632: 26911,
+		1633: 26916,
+		3700: 35712,
+		3701: 35722,
+		4741: 65509,
+		4742: 65535,
+	}
+	for ind, val := range cmapSubtable0StartCode {
+		startCode := cmapSubTable0["startCode"].([]uint16)
+		if startCode[ind] != val {
+			t.Log("cmap subTable 0 startCode error, startCode index and value is ", ind, startCode[ind], val)
+			t.Fail()
+		}
+	}
+
+	// check format 4 idDelta slice
+	idDelta := cmapSubTable0["idDelta"].([]uint16)
+	if len(idDelta) != 4743 {
+		t.Log("cmap subtable 0 idDelta length error, real and current length is ", 4743, len(idDelta))
+		t.Fail()
+	}
+
+	cmapSubtable0IdDelta := map[int]uint16{
+		0:    1,
+		1:    65508,
+		98:   0,
+		99:   0,
+		1971: 0,
+		1972: 37274,
+		4740: 10760,
+		4741: 10752,
+		4742: 1,
+	}
+	for ind, val := range cmapSubtable0IdDelta {
+		if idDelta[ind] != val {
+			t.Log("cmap subTablfe 0 startCode error, startCode index and value is ", ind, idDelta[ind], val)
+			t.Fail()
+		}
+	}
+
+	// check check format 4 idRangeOffset slice
+	cmapSubtable0IdRangeOffset := map[int]uint16{
+		0:    0,
+		1:    0,
+		98:   9658,
+		99:   9670,
+		2378: 12804,
+		2379: 12806,
+		4741: 0,
+		4742: 0,
+	}
+	for ind, val := range cmapSubtable0IdRangeOffset {
+		idRangeOffset := cmapSubTable0["idRangeOffset"].([]uint16)
+		if idRangeOffset[ind] != val {
+			t.Log("cmap subTable 0 idRangeOffset error, idRangeOffset index and value is ", ind, idRangeOffset[ind], val)
+			t.Fail()
+		}
 	}
 
 	// check cmap format 0
