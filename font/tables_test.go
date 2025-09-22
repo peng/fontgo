@@ -939,7 +939,7 @@ func TestAllTable(t *testing.T) {
 		}
 	}
 
-	// check check format 4 idRangeOffset slice
+	// check format 4 idRangeOffset slice
 	cmapSubtable0IdRangeOffset := map[int]uint16{
 		0:    0,
 		1:    0,
@@ -954,6 +954,36 @@ func TestAllTable(t *testing.T) {
 		idRangeOffset := cmapSubTable0["idRangeOffset"].([]uint16)
 		if idRangeOffset[ind] != val {
 			t.Log("cmap subTable 0 idRangeOffset error, idRangeOffset index and value is ", ind, idRangeOffset[ind], val)
+			t.Fail()
+		}
+	}
+
+	if cmapSubTable0["glyphIndexArrayOffset"] != 148300 {
+		t.Log("cmap subTablfe 0 glyphIndexArrayOffset error, glyphIndexArrayOffset is ", cmapSubTable0["glyphIndexArrayOffset"].(int))
+		t.Fail()
+	}
+
+	// check format 4 glyphIndexArray slice
+	// check length
+	if len(cmapSubTable0["glyphIndexArray"].([]uint16)) != 8169 {
+		t.Log("cmap subtable 0 glyphIndexArray error, glyphIndexArray length is ", len(cmapSubTable0["glyphIndexArray"].([]uint16)))
+		t.Fail()
+	}
+
+	cmapSubTable0GlyphIndexArray := map[int]uint16{
+		0: 3,
+		1: 10660,
+		600: 2558,
+		601: 9532,
+		2848: 252,
+		2849: 6753,
+		8167: 10739,
+		8168: 10724,
+	}
+	for ind, val := range cmapSubTable0GlyphIndexArray {
+		glyphIndexArray := cmapSubTable0["glyphIndexArray"].([]uint16)
+		if glyphIndexArray[ind] != val {
+			t.Log("cmap subTable 0 glyphIndexArray error, glyphIndexArray index and value is ", ind, glyphIndexArray[ind], val)
 			t.Fail()
 		}
 	}
