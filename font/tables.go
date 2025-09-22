@@ -777,6 +777,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 
 		// startPos := pos
 		curPos := startPos + int(subTable["offset"].(uint32))
+		startOffset := curPos
 
 		subTable["format"] = int(getUint16(data[curPos : curPos+2]))
 		curPos += 2
@@ -899,7 +900,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["glyphIndexArrayOffset"] = curPos
 
 			// The remaining is glyphIndexArray length
-			glyphLen := (subTable["length"].(int) - (curPos - startPos)) / 2
+			glyphLen := (subTable["length"].(int) - (curPos - startOffset)) / 2
 			var glyphIndexArray []uint16
 			for i := 0; i < glyphLen; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint16(data[curPos:curPos+2]))
