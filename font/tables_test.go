@@ -971,10 +971,10 @@ func TestAllTable(t *testing.T) {
 	}
 
 	cmapSubTable0GlyphIndexArray := map[int]uint16{
-		0: 3,
-		1: 10660,
-		600: 2558,
-		601: 9532,
+		0:    3,
+		1:    10660,
+		600:  2558,
+		601:  9532,
 		2848: 252,
 		2849: 6753,
 		8167: 10739,
@@ -1002,6 +1002,16 @@ func TestAllTable(t *testing.T) {
 
 	if cmapSubTable1["offset"].(uint32) != 54326 {
 		t.Log("cmap subTable 1 offset error, offset is ", cmapSubTable1["offset"].(uint32))
+		t.Fail()
+	}
+
+	if cmapSubTable1["length"].(int) != 262 {
+		t.Log("cmap subTable 1 length error, length is ", cmapSubTable1["length"].(int))
+		t.Fail()
+	}
+
+	if cmapSubTable1["language"].(uint16) != 0 {
+		t.Log("cmap subTable 1 language error, language is ", cmapSubTable1["language"].(uint16))
 		t.Fail()
 	}
 }
