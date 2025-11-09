@@ -792,13 +792,8 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			subTable["language"] = getUint16(data[curPos : curPos+2])
 			curPos += 2
 
-			len, ok := subTable["length"].(int)
-			if !ok {
-				err = errors.New("cmap format0 length error")
-				return
-			}
 			var glyphIndexArray []uint8
-			for i := 0; i < len; i++ {
+			for i := 0; i < 256; i++ {
 				glyphIndexArray = append(glyphIndexArray, getUint8(data[curPos:curPos+1]))
 				curPos++
 			}
@@ -1071,7 +1066,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 	}
 
 	// Read Windows support
-	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
+	// cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
 
 	return
 }
