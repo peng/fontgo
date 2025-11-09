@@ -1014,4 +1014,31 @@ func TestAllTable(t *testing.T) {
 		t.Log("cmap subTable 1 language error, language is ", cmapSubTable1["language"].(uint16))
 		t.Fail()
 	}
+
+	// check format 0 glyphIndexArray slice
+	// check length
+	if len(cmapSubTable1["glyphIndexArray"].([]uint8)) != 256 {
+		t.Log("cmap subtable 1 glyphIndexArray error, glyphIndexArray length is ", len(cmapSubTable1["glyphIndexArray"].([]uint8)))
+		t.Fail()
+	}
+
+	cmapSubTable1GlyphIndexArray := map[int]uint8{
+		0:   1,
+		1:   0,
+		2:   0,
+		180: 0,
+		181: 0,
+		234: 0,
+		235: 0,
+		254: 0,
+		255: 0,
+	}
+
+	for ind, val := range cmapSubTable1GlyphIndexArray {
+		glyphIndexArray := cmapSubTable1["glyphIndexArray"].([]uint8)
+		if glyphIndexArray[ind] != val {
+			t.Log("cmap subTable 1 glyphIndexArray error, glyphIndexArray index and value is ", ind, glyphIndexArray[ind], val)
+			t.Fail()
+		}
+	}
 }
