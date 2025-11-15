@@ -2190,10 +2190,10 @@ type SfntVariationAxis struct {
 	NameID       uint16 `json:"nameId"`
 }
 type SfntInstance struct {
-	NameID   uint16 `json:"nameId"`
-	Flags    uint16 `json:"flags"`
-	Coord    uint32 `json:"coord"`
-	PsNameID uint16 `json:"psNameId"`
+	NameID      uint16   `json:"nameId"`
+	Flags       uint16   `json:"flags"`
+	Coordinates []uint32 `json:"coordinates"`
+	PsNameID    uint16   `json:"psNameId"`
 }
 type Fvar struct {
 	Version        string               `json:"version"`
@@ -2208,20 +2208,33 @@ type Fvar struct {
 }
 
 func GetFvar(data []byte, pos int) (fvar *Fvar) {
+	// Basic length check for header (16 bytes)
+	if len(data) < pos+16 {
+		return nil
+	}
+	fvar = new(Fvar)
 	majorVersion := strconv.Itoa(int(getUint16(data[pos : pos+2])))
 	minorVersion := strconv.Itoa(int(getUint16(data[pos+2 : pos+4])))
-	fvar.Version = (majorVersion + minorVersion)
+	fvar.Version = majorVersion + "." + minorVersion
 	pos += 4
 	fvar.OffsetToData = getUint16(data[pos : pos+2])
 	fvar.CountSizePairs = getUint16(data[pos+2 : pos+4])
-	fvar.AxisCount = getUint16(data[pos+6 : pos+8])
-	fvar.AxisSize = getUint16(data[pos+10 : pos+12])
-	fvar.InstanceCount = getUint16(data[pos+12 : pos+14])
-	fvar.InstanceSize = getUint16(data[pos+14 : pos+16])
-	pos += 16
+	fvar.AxisCount = getUint16(data[pos+4 : pos+6])
+	fvar.AxisSize = getUint16(data[pos+6 : pos+8])
+	fvar.InstanceCount = getUint16(data[pos+8 : pos+10])
+	fvar.InstanceSize = getUint16(data[pos+10 : pos+12])
+	pos += 12
 
 	axisCount := int(fvar.AxisCount)
+	axisSize := int(fvar.AxisSize)
+	if axesTotal := pos + axesCountTotalSize(axisCount, axisSize); axesTotal > len(data) {
+		return nil
+	}
+
 	for i := 0; i < axisCount; i++ {
+		if pos+20 > len(data) { // each axis record expected 20 bytes
+			return nil
+		}
 		fvar.Axis = append(fvar.Axis, &SfntVariationAxis{
 			getUint32(data[pos : pos+4]),
 			getFixed32(data[pos+4 : pos+8]),
@@ -2234,17 +2247,58 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 	}
 
 	instanceCount := int(fvar.InstanceCount)
-	for i := 0; i < instanceCount; i++ {
-		fvar.Instance = append(fvar.Instance, &SfntInstance{
-			getUint16(data[pos : pos+2]),
-			getUint16(data[pos+2 : pos+4]),
-			getFixed32(data[pos+4 : pos+8]),
-			getUint16(data[pos+8 : pos+10]),
-		})
-		pos += 10
+	instSize := int(fvar.InstanceSize)
+	// Validate instance size consistency with axisCount (must be 4 + axisCount*4 or 6 + axisCount*4)
+	minExpected := 4 + axisCount*4
+	maxExpected := minExpected + 2
+	if instSize != minExpected && instSize != maxExpected {
+		// Size mismatch; still attempt parse defensively if length permits
+		if instSize < minExpected || instSize > maxExpected+4 { // arbitrarily allow small slack
+			return fvar
+		}
 	}
 
-	return
+	for i := 0; i < instanceCount; i++ {
+		if pos+instSize > len(data) {
+			return nil
+		}
+		start := pos
+		nameID := getUint16(data[pos : pos+2])
+		flags := getUint16(data[pos+2 : pos+4])
+		pos += 4
+		coords := make([]uint32, axisCount)
+		for c := 0; c < axisCount; c++ {
+			if pos+4 > len(data) {
+				return nil
+			}
+			coords[c] = getFixed32(data[pos : pos+4])
+			pos += 4
+		}
+		remaining := instSize - (pos - start)
+		psNameID := uint16(0)
+		if remaining >= 2 {
+			psNameID = getUint16(data[pos : pos+2])
+			pos += 2
+			remaining -= 2
+		}
+		// Skip any undocumented padding if present
+		if remaining > 0 {
+			pos += remaining
+		}
+		fvar.Instance = append(fvar.Instance, &SfntInstance{
+			NameID:      nameID,
+			Flags:       flags,
+			Coordinates: coords,
+			PsNameID:    psNameID,
+		})
+	}
+
+	return fvar
+}
+
+// axesCountTotalSize helper returns total bytes occupied by all axis records
+func axesCountTotalSize(axisCount int, axisSize int) int {
+	return axisCount * axisSize
 }
 
 type Itag struct {
@@ -2255,10 +2309,11 @@ type Itag struct {
 
 func GetItag(data []byte, pos int) (itag *Itag, err error) {
 	start := pos
+	itag = new(Itag)
 	itag.Version = getUint32(data[pos : pos+4])
 
 	if int(itag.Version) != 1 {
-		err = errors.New("Unsupported ltag table version.")
+		err = errors.New("unsupported ltag table version")
 		return
 	}
 
@@ -2287,10 +2342,11 @@ type Meta struct {
 
 func GetMeta(data []byte, pos int) (meta *Meta, err error) {
 	start := pos
+	meta = new(Meta)
 	meta.Version = getUint32(data[pos : pos+4])
 	pos += 4
 	if int(meta.Version) != 1 {
-		err = errors.New("Unsupported META table version.")
+		err = errors.New("unsupported META table version")
 		return
 	}
 	meta.Flags = getUint32(data[pos : pos+4])
@@ -2299,7 +2355,7 @@ func GetMeta(data []byte, pos int) (meta *Meta, err error) {
 	pos += 12
 
 	num := int(meta.NumDataMaps)
-	var tags map[string]string
+	tags := make(map[string]string)
 	for i := 0; i < num; i++ {
 		tag := FromCharCodeByte(data[pos : pos+4])
 		offset := getUint32(data[pos+4 : pos+8])
