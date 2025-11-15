@@ -1042,3 +1042,178 @@ func TestAllTable(t *testing.T) {
 		}
 	}
 }
+
+func TestGetFvar(t *testing.T) {
+	data := []byte{
+		0x00, 0x01, 0x00, 0x00, // version 1.0
+		0x00, 0x00, // offsetToData
+		0x00, 0x00, // countSizePairs
+		0x00, 0x01, // axisCount
+		0x00, 0x14, // axisSize
+		0x00, 0x01, // instanceCount
+		0x00, 0x0A, // instanceSize
+		// axis
+		0x12, 0x34, 0x56, 0x78, // tag
+		0x00, 0x00, 0x00, 0x00, // min
+		0x00, 0x00, 0x00, 0x01, // def
+		0x00, 0x00, 0x00, 0x02, // max
+		0x00, 0x03, // flags
+		0x00, 0x04, // nameID
+		// instance
+		0x00, 0x05, // nameID
+		0x00, 0x06, // flags
+		0x00, 0x00, 0x00, 0x07, // coord
+		0x00, 0x08, // ps
+	}
+
+	fvar := GetFvar(data, 0)
+	if fvar == nil {
+		t.Fatal("fvar should not be nil")
+	}
+	if fvar.Version != "1.0" {
+		t.Errorf("version want 1.0 got %s", fvar.Version)
+	}
+	if fvar.AxisCount != 1 || len(fvar.Axis) != 1 {
+		t.Errorf("axisCount want 1 got %d", fvar.AxisCount)
+	}
+	if fvar.InstanceCount != 1 || len(fvar.Instance) != 1 {
+		t.Errorf("instanceCount want 1 got %d", fvar.InstanceCount)
+	}
+	// Assert axis field values
+	axis := fvar.Axis[0]
+	if axis.AxisTag != 0x12345678 {
+		t.Errorf("axis.AxisTag want 0x12345678 got 0x%08X", axis.AxisTag)
+	}
+	if axis.MinValue != 0x00000000 {
+		t.Errorf("axis.MinValue want 0x00000000 got 0x%08X", axis.MinValue)
+	}
+	if axis.DefaultValue != 0x00000001 {
+		t.Errorf("axis.DefaultValue want 0x00000001 got 0x%08X", axis.DefaultValue)
+	}
+	if axis.MaxValue != 0x00000002 {
+		t.Errorf("axis.MaxValue want 0x00000002 got 0x%08X", axis.MaxValue)
+	}
+	if axis.Flags != 0x0003 {
+		t.Errorf("axis.Flags want 0x0003 got 0x%04X", axis.Flags)
+	}
+	if axis.NameID != 0x0004 {
+		t.Errorf("axis.NameID want 0x0004 got 0x%04X", axis.NameID)
+	}
+
+	// Assert instance field values
+	inst := fvar.Instance[0]
+	if inst.NameID != 0x0005 {
+		t.Errorf("instance.NameID want 0x0005 got 0x%04X", inst.NameID)
+	}
+	if inst.Flags != 0x0006 {
+		t.Errorf("instance.Flags want 0x0006 got 0x%04X", inst.Flags)
+	}
+	if len(inst.Coordinates) != 1 || inst.Coordinates[0] != 0x00000007 {
+		t.Errorf("instance.Coordinates[0] want 0x00000007 got %v", inst.Coordinates)
+	}
+	if inst.PsNameID != 0x0008 {
+		t.Errorf("instance.PsNameID want 0x0008 got 0x%04X", inst.PsNameID)
+	}
+}
+
+// TestGetFvarMultiAxis verifies parsing of multiple axes and multiple coordinates per instance.
+func TestGetFvarMultiAxis(t *testing.T) {
+	// Construct spec-like fvar table:
+	// Header (16 bytes): version(4) offsetToData(2) countSizePairs(2) axisCount(2) axisSize(2) instanceCount(2) instanceSize(2)
+	// Two axes (each 20 bytes): 'wght' and 'wdth'
+	// Two instances (each 14 bytes: nameID(2) flags(2) coords(2*4) psNameID(2))
+	data := []byte{
+		0x00, 0x01, 0x00, 0x00, // version 1.0
+		0x00, 0x10, // offsetToData = 16
+		0x00, 0x01, // countSizePairs = 1
+		0x00, 0x02, // axisCount = 2
+		0x00, 0x14, // axisSize = 20
+		0x00, 0x02, // instanceCount = 2
+		0x00, 0x0E, // instanceSize = 14 (with psNameID)
+		// Axis 0 'wght'
+		'w', 'g', 'h', 't', // tag
+		0x00, 0x64, 0x00, 0x00, // min 100.0 -> 0x00640000
+		0x01, 0x90, 0x00, 0x00, // default 400.0 -> 0x01900000
+		0x03, 0x84, 0x00, 0x00, // max 900.0 -> 0x03840000
+		0x00, 0x00, // flags
+		0x00, 0x01, // nameID
+		// Axis 1 'wdth'
+		'w', 'd', 't', 'h', // tag
+		0x00, 0x32, 0x00, 0x00, // min 50.0 -> 0x00320000
+		0x00, 0x64, 0x00, 0x00, // default 100.0 -> 0x00640000
+		0x00, 0xC8, 0x00, 0x00, // max 200.0 -> 0x00C80000
+		0x00, 0x00, // flags
+		0x00, 0x02, // nameID
+		// Instance 0
+		0x00, 0x0A, // nameID
+		0x00, 0x00, // flags
+		0x01, 0x90, 0x00, 0x00, // wght = 400.0
+		0x00, 0x64, 0x00, 0x00, // wdth = 100.0
+		0x00, 0x14, // psNameID
+		// Instance 1
+		0x00, 0x0B, // nameID
+		0x00, 0x00, // flags
+		0x00, 0xC8, 0x00, 0x00, // wght = 200.0
+		0x00, 0x64, 0x00, 0x00, // wdth = 100.0
+		0x00, 0x15, // psNameID
+	}
+
+	fvar := GetFvar(data, 0)
+	if fvar == nil {
+		t.Fatal("fvar should not be nil for valid data")
+	}
+	if fvar.AxisCount != 2 || len(fvar.Axis) != 2 {
+		t.Fatalf("expected 2 axes, got %d", len(fvar.Axis))
+	}
+	if fvar.InstanceCount != 2 || len(fvar.Instance) != 2 {
+		t.Fatalf("expected 2 instances, got %d", len(fvar.Instance))
+	}
+	// Axis 0 checks
+	axis0 := fvar.Axis[0]
+	if axis0.AxisTag != uint32('w')<<24|uint32('g')<<16|uint32('h')<<8|uint32('t') {
+		t.Errorf("axis0 tag mismatch: %08X", axis0.AxisTag)
+	}
+	if axis0.MinValue != 0x00640000 || axis0.DefaultValue != 0x01900000 || axis0.MaxValue != 0x03840000 {
+		t.Errorf("axis0 values mismatch")
+	}
+	// Axis 1 checks
+	axis1 := fvar.Axis[1]
+	if axis1.MinValue != 0x00320000 || axis1.DefaultValue != 0x00640000 || axis1.MaxValue != 0x00C80000 {
+		t.Errorf("axis1 values mismatch")
+	}
+	// Instance 0
+	inst0 := fvar.Instance[0]
+	if len(inst0.Coordinates) != 2 || inst0.Coordinates[0] != 0x01900000 || inst0.Coordinates[1] != 0x00640000 {
+		t.Errorf("instance0 coordinates mismatch: %v", inst0.Coordinates)
+	}
+	if inst0.PsNameID != 0x0014 {
+		t.Errorf("instance0 psNameID mismatch: %04X", inst0.PsNameID)
+	}
+	// Instance 1
+	inst1 := fvar.Instance[1]
+	if len(inst1.Coordinates) != 2 || inst1.Coordinates[0] != 0x00C80000 || inst1.Coordinates[1] != 0x00640000 {
+		t.Errorf("instance1 coordinates mismatch: %v", inst1.Coordinates)
+	}
+	if inst1.PsNameID != 0x0015 {
+		t.Errorf("instance1 psNameID mismatch: %04X", inst1.PsNameID)
+	}
+}
+
+// TestGetFvarMalformed ensures truncated data returns nil.
+func TestGetFvarMalformed(t *testing.T) {
+	// Truncate after header (no axis/instance data)
+	data := []byte{
+		0x00, 0x01, 0x00, 0x00,
+		0x00, 0x10,
+		0x00, 0x01,
+		0x00, 0x01,
+		0x00, 0x14,
+		0x00, 0x01,
+		0x00, 0x0A,
+	}
+	fvar := GetFvar(data, 0)
+	if fvar != nil {
+		// Expect nil due to missing axis bytes
+		t.Errorf("expected nil for malformed/truncated data")
+	}
+}
