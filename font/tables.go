@@ -660,11 +660,12 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 		startCodeSource, exist2 := format4["startCode"]
 		endCodeSource, exist3 := format4["endCode"]
 		idRangeOffsetSource, exist4 := format4["idRangeOffset"]
-		glyphIndexArrayOffsetSource, exist5 := format4["glyphIndexArrayOffset"]
-		idDeltaSource, exist6 := format4["idDelta"]
-		glyphIndexArraySource, exist7 := format4["glyphIndexArray"]
+		idDeltaSource, exist5 := format4["idDelta"]
+		glyphIndexArraySource, exist6 := format4["glyphIndexArray"]
+		glyphIndexArrayOffsetSource, exist7 := format4["glyphIndexArrayOffset"]
+		idRangeOffsetOffsetSource, exist8 := format4["idRangeOffsetOffset"]
 
-		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 {
+		if !exist1 || !exist2 || !exist3 || !exist4 || !exist5 || !exist6 || !exist7 || !exist8 {
 			err = errors.New("Read format4 map error")
 			return
 		}
@@ -673,23 +674,31 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 		startCode := startCodeSource.([]uint16)
 		endCode := endCodeSource.([]uint16)
 		idRangeOffset := idRangeOffsetSource.([]uint16)
-		glyphIndexArrayOffset := glyphIndexArrayOffsetSource.(int)
 		idDelta := idDeltaSource.([]uint16)
 		glyphIndexArray := glyphIndexArraySource.([]uint16)
+		glyphIndexArrayOffset := glyphIndexArrayOffsetSource.(int)
+		idRangeOffsetOffset := idRangeOffsetOffsetSource.(int)
+
+		// Calculate graphIdArrayIndexOffset like in JavaScript
+		graphIdArrayIndexOffset := (glyphIndexArrayOffset - idRangeOffsetOffset) / 2
 
 		for i := 0; i < segCount; i++ {
 			for start, end := int(startCode[i]), int(endCode[i]); start <= end; start++ {
 				if int(idRangeOffset[i]) == 0 {
 					code[start] = (start + int(idDelta[i])) % 0x10000
 				} else {
-					index := i + int(idRangeOffset[i])/2 + (start - int(startCode[i])) - glyphIndexArrayOffset
+					// Calculate index exactly as in JavaScript reference code
+					index := i + int(idRangeOffset[i])/2 + (start - int(startCode[i])) - graphIdArrayIndexOffset
 
-					glyphIndex := int(glyphIndexArray[index])
+					// Boundary check to prevent panic
+					if index >= 0 && index < len(glyphIndexArray) {
+						glyphIndex := int(glyphIndexArray[index])
 
-					if glyphIndex != 0 {
-						code[start] = (glyphIndex + int(idDelta[i])) % 0x10000
-					} else {
-						code[start] = 0
+						if glyphIndex != 0 {
+							code[start] = (glyphIndex + int(idDelta[i])) % 0x10000
+						} else {
+							code[start] = 0
+						}
 					}
 				}
 			}
@@ -716,13 +725,20 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 		index := 0
 
 		for i := 0; i < 256; i++ {
+			if i >= len(subHeaderKeys) {
+				break
+			}
 			k := int(subHeaderKeys[i])
 			if k == 0 {
+				if len(subHeaders) == 0 {
+					continue
+				}
 
-				if i >= maxPos || i < int(subHeaders[0].FirstCode) || i >= int(subHeaders[0].FirstCode+subHeaders[0].EntryCount) || int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode)) >= len(glyphIndexArray) {
+				idxPos := int(subHeaders[0].IdRangeOffset) + (i - int(subHeaders[0].FirstCode))
+				if i >= maxPos || i < int(subHeaders[0].FirstCode) || i >= int(subHeaders[0].FirstCode+subHeaders[0].EntryCount) || idxPos < 0 || idxPos >= len(glyphIndexArray) {
 					index = 0
 				} else {
-					index = int(glyphIndexArray[int(subHeaders[0].IdRangeOffset)+(i-int(subHeaders[0].FirstCode))])
+					index = int(glyphIndexArray[idxPos])
 					if index != 0 {
 						index = index + int(subHeaders[0].IdDelta)
 					}
@@ -733,14 +749,17 @@ func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (cod
 				}
 
 			} else {
-				k := int(subHeaderKeys[i])
+				if k >= len(subHeaders) {
+					continue
+				}
 				entryCount := int(subHeaders[k].EntryCount)
 				for j := 0; j < entryCount; j++ {
+					idxPos := int(subHeaders[k].IdRangeOffset) + j
 
-					if int(subHeaders[k].IdRangeOffset)+j >= len(glyphIndexArray) {
+					if idxPos < 0 || idxPos >= len(glyphIndexArray) {
 						index = 0
 					} else {
-						index = int(glyphIndexArray[int(subHeaders[k].IdRangeOffset)+j])
+						index = int(glyphIndexArray[idxPos])
 						if index != 0 {
 							index = index + int(subHeaders[k].IdDelta)
 						}
@@ -884,6 +903,10 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 				curPos += 2
 			}
 			subTable["idDelta"] = idDelta
+
+			// Save the position where idRangeOffset array starts
+			idRangeOffsetOffset := curPos
+			subTable["idRangeOffsetOffset"] = idRangeOffsetOffset
 
 			var idRangeOffset []uint16
 			for i := 0; i < segCount; i++ {
@@ -1066,7 +1089,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 	}
 
 	// Read Windows support
-	// cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
+	cmap.WindowsCode, err = readWindowsCode(cmap.SubTables, maxpNumGlyphs)
 
 	return
 }
