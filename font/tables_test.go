@@ -1372,8 +1372,11 @@ func TestGetKernWindows(t *testing.T) {
 	if kern.SubHeaders["length"] != 26 {
 		t.Errorf("Expected subtable length=26, got %d", kern.SubHeaders["length"])
 	}
-	if kern.SubHeaders["coverage"] != 1 {
-		t.Errorf("Expected coverage=1, got %d", kern.SubHeaders["coverage"])
+	if kern.SubHeaders["coverage"] != 0 {
+		t.Errorf("Expected coverage=0, got %d", kern.SubHeaders["coverage"])
+	}
+	if kern.SubHeaders["format"] != 0 {
+		t.Errorf("Expected format=0, got %d", kern.SubHeaders["format"])
 	}
 	if kern.SubHeaders["nPairs"] != 2 {
 		t.Errorf("Expected nPairs=2, got %d", kern.SubHeaders["nPairs"])
@@ -1529,5 +1532,190 @@ func TestGetKernUnsupportedVersion(t *testing.T) {
 	}
 	if kern == nil {
 		t.Error("Expected kern struct to be non-nil even on error")
+	}
+}
+
+// TestGetKernWindowsFormat2 tests Windows format 2 kern table (n×m array)
+func TestGetKernWindowsFormat2(t *testing.T) {
+	data := getWindowsFormat2KernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 0 {
+		t.Errorf("Expected Version=0, got %d", kern.Version)
+	}
+	if kern.NTables != 1 {
+		t.Errorf("Expected NTables=1, got %d", kern.NTables)
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["format"] != 2 {
+		t.Errorf("Expected format=2, got %d", kern.SubHeaders["format"])
+	}
+	if kern.SubHeaders["coverage"] != 2 {
+		t.Errorf("Expected coverage=2, got %d", kern.SubHeaders["coverage"])
+	}
+
+	// Verify format 2 data exists
+	if kern.Format2 == nil {
+		t.Fatal("Expected Format2 data to be non-nil")
+	}
+
+	// Verify format 2 structure
+	if kern.Format2.RowWidth != 4 {
+		t.Errorf("Expected rowWidth=4, got %d", kern.Format2.RowWidth)
+	}
+	if kern.Format2.LeftOffsetTable != 14 {
+		t.Errorf("Expected leftOffsetTable=14, got %d", kern.Format2.LeftOffsetTable)
+	}
+	if kern.Format2.RightOffsetTable != 22 {
+		t.Errorf("Expected rightOffsetTable=22, got %d", kern.Format2.RightOffsetTable)
+	}
+
+	// Verify left class table
+	if kern.Format2.LeftClassTable == nil {
+		t.Fatal("Expected LeftClassTable to be non-nil")
+	}
+	if kern.Format2.LeftClassTable.FirstGlyph != 65 {
+		t.Errorf("Expected left firstGlyph=65, got %d", kern.Format2.LeftClassTable.FirstGlyph)
+	}
+	if kern.Format2.LeftClassTable.NGlyphs != 2 {
+		t.Errorf("Expected left nGlyphs=2, got %d", kern.Format2.LeftClassTable.NGlyphs)
+	}
+
+	// Verify right class table
+	if kern.Format2.RightClassTable == nil {
+		t.Fatal("Expected RightClassTable to be non-nil")
+	}
+	if kern.Format2.RightClassTable.FirstGlyph != 86 {
+		t.Errorf("Expected right firstGlyph=86, got %d", kern.Format2.RightClassTable.FirstGlyph)
+	}
+	if kern.Format2.RightClassTable.NGlyphs != 2 {
+		t.Errorf("Expected right nGlyphs=2, got %d", kern.Format2.RightClassTable.NGlyphs)
+	}
+}
+
+// TestGetKernMacFormat2 tests Mac format 2 kern table (n×m array)
+func TestGetKernMacFormat2(t *testing.T) {
+	data := getMacFormat2KernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 1 {
+		t.Errorf("Expected Version=1, got %d", kern.Version)
+	}
+	if kern.NTables != 1 {
+		t.Errorf("Expected NTables=1, got %d", kern.NTables)
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["format"] != 2 {
+		t.Errorf("Expected format=2, got %d", kern.SubHeaders["format"])
+	}
+	if kern.SubHeaders["coverage"] != 0x8002 {
+		t.Errorf("Expected coverage=0x8002, got %d", kern.SubHeaders["coverage"])
+	}
+
+	// Verify format 2 data exists
+	if kern.Format2 == nil {
+		t.Fatal("Expected Format2 data to be non-nil")
+	}
+
+	// Verify format 2 structure
+	if kern.Format2.RowWidth != 4 {
+		t.Errorf("Expected rowWidth=4, got %d", kern.Format2.RowWidth)
+	}
+
+	// Verify left class table
+	if kern.Format2.LeftClassTable == nil {
+		t.Fatal("Expected LeftClassTable to be non-nil")
+	}
+	if kern.Format2.LeftClassTable.FirstGlyph != 84 {
+		t.Errorf("Expected left firstGlyph=84 ('T'), got %d", kern.Format2.LeftClassTable.FirstGlyph)
+	}
+	if kern.Format2.LeftClassTable.NGlyphs != 2 {
+		t.Errorf("Expected left nGlyphs=2, got %d", kern.Format2.LeftClassTable.NGlyphs)
+	}
+
+	// Verify right class table
+	if kern.Format2.RightClassTable == nil {
+		t.Fatal("Expected RightClassTable to be non-nil")
+	}
+	if kern.Format2.RightClassTable.FirstGlyph != 111 {
+		t.Errorf("Expected right firstGlyph=111 ('o'), got %d", kern.Format2.RightClassTable.FirstGlyph)
+	}
+}
+
+// TestGetKernMacFormat3 tests Mac format 3 kern table (n×m index array)
+func TestGetKernMacFormat3(t *testing.T) {
+	data := getMacFormat3KernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 1 {
+		t.Errorf("Expected Version=1, got %d", kern.Version)
+	}
+	if kern.NTables != 1 {
+		t.Errorf("Expected NTables=1, got %d", kern.NTables)
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["format"] != 3 {
+		t.Errorf("Expected format=3, got %d", kern.SubHeaders["format"])
+	}
+
+	// Verify format 3 data exists
+	if kern.Format3 == nil {
+		t.Fatal("Expected Format3 data to be non-nil")
+	}
+
+	// Verify format 3 structure
+	if kern.Format3.GlyphCount != 4 {
+		t.Errorf("Expected glyphCount=4, got %d", kern.Format3.GlyphCount)
+	}
+	if kern.Format3.KernValueCount != 2 {
+		t.Errorf("Expected kernValueCount=2, got %d", kern.Format3.KernValueCount)
+	}
+	if kern.Format3.LeftClassCount != 2 {
+		t.Errorf("Expected leftClassCount=2, got %d", kern.Format3.LeftClassCount)
+	}
+	if kern.Format3.RightClassCount != 2 {
+		t.Errorf("Expected rightClassCount=2, got %d", kern.Format3.RightClassCount)
+	}
+
+	// Verify kern values
+	if len(kern.Format3.KernValues) != 2 {
+		t.Fatalf("Expected 2 kern values, got %d", len(kern.Format3.KernValues))
+	}
+	if kern.Format3.KernValues[0] != -50 {
+		t.Errorf("Expected kernValue[0]=-50, got %d", kern.Format3.KernValues[0])
+	}
+	if kern.Format3.KernValues[1] != -20 {
+		t.Errorf("Expected kernValue[1]=-20, got %d", kern.Format3.KernValues[1])
+	}
+
+	// Verify left class array
+	if len(kern.Format3.LeftClass) != 4 {
+		t.Errorf("Expected 4 left class entries, got %d", len(kern.Format3.LeftClass))
+	}
+
+	// Verify right class array
+	if len(kern.Format3.RightClass) != 4 {
+		t.Errorf("Expected 4 right class entries, got %d", len(kern.Format3.RightClass))
+	}
+
+	// Verify kern index array
+	expectedIndexCount := 2 * 2 // leftClassCount × rightClassCount
+	if len(kern.Format3.KernIndex) != expectedIndexCount {
+		t.Errorf("Expected %d kern index entries, got %d", expectedIndexCount, len(kern.Format3.KernIndex))
 	}
 }
