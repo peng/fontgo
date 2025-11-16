@@ -1892,6 +1892,7 @@ type nPairs struct {
 }
 
 func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernPairs []*nPairs) {
+	subHeaders = make(map[string]int)
 	subHeaders["version"] = int(getUint16(data[pos : pos+2]))
 	subHeaders["length"] = int(getUint16(data[pos+2 : pos+4]))
 	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
@@ -1916,6 +1917,7 @@ func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernP
 }
 
 func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]int, kernPairs []*nPairs) {
+	subHeaders = make(map[string]int)
 	subHeaders["length"] = int(getUint32(data[pos : pos+4]))
 	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
 	tupleIndex := getUint16(data[pos+6 : pos+8])
@@ -2025,6 +2027,7 @@ type OS2 struct {
 }
 
 func GetOS2(data []byte, pos int) (os2 *OS2) {
+	os2 = new(OS2)
 	os2.Version = getUint16(data[pos : pos+2])
 	os2.XAvgCharWidth = getInt16(data[pos+2 : pos+4])
 	os2.UsWeightClass = getUint16(data[pos+4 : pos+6])
