@@ -1345,3 +1345,189 @@ func TestGetFvarMalformed(t *testing.T) {
 		t.Errorf("expected nil for malformed/truncated data")
 	}
 }
+
+// TestGetKernWindows tests Windows format kern table (version 0)
+func TestGetKernWindows(t *testing.T) {
+	data := getWindowsKernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 0 {
+		t.Errorf("Expected Version=0, got %d", kern.Version)
+	}
+	if kern.NTables != 1 {
+		t.Errorf("Expected NTables=1, got %d", kern.NTables)
+	}
+	if kern.IsMacNewKern {
+		t.Errorf("Expected IsMacNewKern=false for Windows format")
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["version"] != 0 {
+		t.Errorf("Expected subtable version=0, got %d", kern.SubHeaders["version"])
+	}
+	if kern.SubHeaders["length"] != 26 {
+		t.Errorf("Expected subtable length=26, got %d", kern.SubHeaders["length"])
+	}
+	if kern.SubHeaders["coverage"] != 1 {
+		t.Errorf("Expected coverage=1, got %d", kern.SubHeaders["coverage"])
+	}
+	if kern.SubHeaders["nPairs"] != 2 {
+		t.Errorf("Expected nPairs=2, got %d", kern.SubHeaders["nPairs"])
+	}
+
+	// Verify kerning pairs
+	if len(kern.Pairs) != 2 {
+		t.Fatalf("Expected 2 kerning pairs, got %d", len(kern.Pairs))
+	}
+
+	// Pair 1: A-V = -50
+	pair1 := kern.Pairs[0]
+	if pair1.Left != 65 || pair1.Right != 86 || pair1.Value != -50 {
+		t.Errorf("Pair 1 expected (65,86,-50), got (%d,%d,%d)", pair1.Left, pair1.Right, pair1.Value)
+	}
+
+	// Pair 2: F-. = -30
+	pair2 := kern.Pairs[1]
+	if pair2.Left != 70 || pair2.Right != 46 || pair2.Value != -30 {
+		t.Errorf("Pair 2 expected (70,46,-30), got (%d,%d,%d)", pair2.Left, pair2.Right, pair2.Value)
+	}
+
+	// Verify using binary.BigEndian for independent validation
+	if binary.BigEndian.Uint16(data[0:2]) != 0 {
+		t.Error("Version should be 0")
+	}
+	if binary.BigEndian.Uint16(data[2:4]) != 1 {
+		t.Error("NTables should be 1")
+	}
+	// First pair left glyph
+	if binary.BigEndian.Uint16(data[18:20]) != 65 {
+		t.Error("First pair left should be 65")
+	}
+}
+
+// TestGetKernMac tests Mac format kern table (version 1, old format)
+func TestGetKernMac(t *testing.T) {
+	data := getMacKernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 1 {
+		t.Errorf("Expected Version=1, got %d", kern.Version)
+	}
+	if kern.NTables != 1 {
+		t.Errorf("Expected NTables=1, got %d", kern.NTables)
+	}
+	if kern.IsMacNewKern {
+		t.Errorf("Expected IsMacNewKern=false for old Mac format")
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["length"] != 32 {
+		t.Errorf("Expected subtable length=32, got %d", kern.SubHeaders["length"])
+	}
+	if kern.SubHeaders["coverage"] != 0x8000 {
+		t.Errorf("Expected coverage=0x8000, got %d", kern.SubHeaders["coverage"])
+	}
+	if kern.SubHeaders["nPairs"] != 2 {
+		t.Errorf("Expected nPairs=2, got %d", kern.SubHeaders["nPairs"])
+	}
+
+	// Verify kerning pairs
+	if len(kern.Pairs) != 2 {
+		t.Fatalf("Expected 2 kerning pairs, got %d", len(kern.Pairs))
+	}
+
+	// Pair 1: T-o = -40
+	pair1 := kern.Pairs[0]
+	if pair1.Left != 84 || pair1.Right != 111 || pair1.Value != -40 {
+		t.Errorf("Pair 1 expected (84,111,-40), got (%d,%d,%d)", pair1.Left, pair1.Right, pair1.Value)
+	}
+
+	// Pair 2: W-a = -20
+	pair2 := kern.Pairs[1]
+	if pair2.Left != 87 || pair2.Right != 97 || pair2.Value != -20 {
+		t.Errorf("Pair 2 expected (87,97,-20), got (%d,%d,%d)", pair2.Left, pair2.Right, pair2.Value)
+	}
+
+	// Verify using binary.BigEndian for independent validation
+	if binary.BigEndian.Uint16(data[0:2]) != 1 {
+		t.Error("Version should be 1")
+	}
+	if binary.BigEndian.Uint16(data[2:4]) != 1 {
+		t.Error("NTables should be 1")
+	}
+}
+
+// TestGetKernMacNew tests Mac format kern table (version 1, new format)
+func TestGetKernMacNew(t *testing.T) {
+	data := getMacNewKernData()
+	kern, err := GetKern(data, 0)
+	if err != nil {
+		t.Fatalf("GetKern failed: %v", err)
+	}
+
+	// Verify kern table header
+	if kern.Version != 1 {
+		t.Errorf("Expected Version=1, got %d", kern.Version)
+	}
+	if kern.NTables != 0 { // nTables is 0 in header for new format
+		t.Errorf("Expected NTables=0 (new format indicator), got %d", kern.NTables)
+	}
+	if !kern.IsMacNewKern {
+		t.Errorf("Expected IsMacNewKern=true for new Mac format")
+	}
+
+	// Verify subtable headers
+	if kern.SubHeaders["length"] != 32 {
+		t.Errorf("Expected subtable length=32, got %d", kern.SubHeaders["length"])
+	}
+	if kern.SubHeaders["nPairs"] != 1 {
+		t.Errorf("Expected nPairs=1, got %d", kern.SubHeaders["nPairs"])
+	}
+
+	// Verify kerning pairs
+	if len(kern.Pairs) != 1 {
+		t.Fatalf("Expected 1 kerning pair, got %d", len(kern.Pairs))
+	}
+
+	// Pair 1: L-Y = -80
+	pair1 := kern.Pairs[0]
+	if pair1.Left != 76 || pair1.Right != 89 || pair1.Value != -80 {
+		t.Errorf("Pair expected (76,89,-80), got (%d,%d,%d)", pair1.Left, pair1.Right, pair1.Value)
+	}
+
+	// Verify using binary.BigEndian for independent validation
+	if binary.BigEndian.Uint16(data[0:2]) != 1 {
+		t.Error("Version should be 1")
+	}
+	if binary.BigEndian.Uint16(data[2:4]) != 0 {
+		t.Error("NTables should be 0 (new format)")
+	}
+	// Actual nTables (32-bit)
+	if binary.BigEndian.Uint32(data[4:8]) != 1 {
+		t.Error("Actual nTables should be 1")
+	}
+}
+
+// TestGetKernUnsupportedVersion tests unsupported kern table version
+func TestGetKernUnsupportedVersion(t *testing.T) {
+	// Create kern data with unsupported version 2
+	data := []byte{
+		0x00, 0x02, // version = 2 (unsupported)
+		0x00, 0x00, // nTables = 0
+	}
+	kern, err := GetKern(data, 0)
+	if err == nil {
+		t.Error("Expected error for unsupported kern version")
+	}
+	if kern == nil {
+		t.Error("Expected kern struct to be non-nil even on error")
+	}
+}
