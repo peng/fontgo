@@ -1,6 +1,7 @@
 package font
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -1039,6 +1040,133 @@ func TestAllTable(t *testing.T) {
 		if glyphIndexArray[ind] != val {
 			t.Log("cmap subTable 1 glyphIndexArray error, glyphIndexArray index and value is ", ind, glyphIndexArray[ind], val)
 			t.Fail()
+		}
+	}
+
+	// check hhea table
+	hheaInfo := tableContent["hhea"]
+	hhea := GetHhea(fileByte, int(hheaInfo.Offset))
+	// Expected hhea values captured from HanyiSentyCrayon.ttf
+	if hhea.Version != 1 {
+		t.Errorf("hhea Version want 1 got %v", hhea.Version)
+	}
+	if hhea.Ascent != 1716 {
+		t.Errorf("hhea Ascent want 1716 got %d", hhea.Ascent)
+	}
+	if hhea.Descent != -418 {
+		t.Errorf("hhea Descent want -418 got %d", hhea.Descent)
+	}
+	if hhea.LineGap != 222 {
+		t.Errorf("hhea LineGap want 222 got %d", hhea.LineGap)
+	}
+	if hhea.AdvanceWidthMax != 2239 {
+		t.Errorf("hhea AdvanceWidthMax want 2239 got %d", hhea.AdvanceWidthMax)
+	}
+	if hhea.MinLeftSideBearing != -183 {
+		t.Errorf("hhea MinLeftSideBearing want -183 got %d", hhea.MinLeftSideBearing)
+	}
+	if hhea.MinRightSideBearing != -2309 {
+		t.Errorf("hhea MinRightSideBearing want -2309 got %d", hhea.MinRightSideBearing)
+	}
+	if hhea.XMaxExtent != 3128 {
+		t.Errorf("hhea XMaxExtent want 3128 got %d", hhea.XMaxExtent)
+	}
+	if hhea.CaretSlopeRise != 1 {
+		t.Errorf("hhea CaretSlopeRise want 1 got %d", hhea.CaretSlopeRise)
+	}
+	if hhea.CaretSlopeRun != 0 {
+		t.Errorf("hhea CaretSlopeRun want 0 got %d", hhea.CaretSlopeRun)
+	}
+	if hhea.CaretOffset != 0 {
+		t.Errorf("hhea CaretOffset want 0 got %d", hhea.CaretOffset)
+	}
+	if hhea.MetricDataFormat != 0 {
+		t.Errorf("hhea MetricDataFormat want 0 got %d", hhea.MetricDataFormat)
+	}
+	if hhea.NumOfLongHorMetrics != 10957 {
+		t.Errorf("hhea NumOfLongHorMetrics want 10957 got %d", hhea.NumOfLongHorMetrics)
+	}
+	if hhea.Reserved1 != 0 || hhea.Reserved2 != 0 || hhea.Reserved3 != 0 || hhea.Reserved4 != 0 {
+		t.Errorf("hhea Reserved fields expected 0 got %d %d %d %d", hhea.Reserved1, hhea.Reserved2, hhea.Reserved3, hhea.Reserved4)
+	}
+
+	// check hmtx table
+	hmtxInfo := tableContent["hmtx"]
+	numLHM := int(hhea.NumOfLongHorMetrics)
+	numGlyphs := int(maxp.NumGlyphs)
+	hmtxOffset := int(hmtxInfo.Offset)
+
+	// Compute expected metrics directly from bytes
+	type pairMetric struct {
+		aw  uint16
+		lsb int16
+	}
+	var expectedFirst []pairMetric
+	for i := 0; i < 3 && i < numLHM; i++ {
+		base := hmtxOffset + i*4
+		aw := binary.BigEndian.Uint16(fileByte[base : base+2])
+		lsb := int16(binary.BigEndian.Uint16(fileByte[base+2 : base+4]))
+		expectedFirst = append(expectedFirst, pairMetric{aw: aw, lsb: lsb})
+	}
+	var expectedLastLSB int16
+	if numGlyphs-numLHM > 0 {
+		lastLSBIndex := (numGlyphs - numLHM - 1)
+		pos := hmtxOffset + numLHM*4 + lastLSBIndex*2
+		expectedLastLSB = int16(binary.BigEndian.Uint16(fileByte[pos : pos+2]))
+	}
+
+	hmtx := GetHmtx(fileByte, hmtxOffset, numLHM, numGlyphs)
+	if hmtx == nil {
+		t.Fatal("hmtx GetHmtx returned nil")
+	}
+	if got := len(hmtx.HMetrics); got != numLHM {
+		t.Fatalf("hmtx HMetrics length want %d got %d", numLHM, got)
+	}
+	if got := len(hmtx.LeftSideBearing); got != (numGlyphs - numLHM) {
+		t.Fatalf("hmtx LeftSideBearing length want %d got %d", (numGlyphs - numLHM), got)
+	}
+	for i := range expectedFirst {
+		if hmtx.HMetrics[i].AdvanceWidth != expectedFirst[i].aw {
+			t.Errorf("hmtx HMetrics[%d].AdvanceWidth want %d got %d", i, expectedFirst[i].aw, hmtx.HMetrics[i].AdvanceWidth)
+		}
+		if hmtx.HMetrics[i].LeftSideBearing != expectedFirst[i].lsb {
+			t.Errorf("hmtx HMetrics[%d].LeftSideBearing want %d got %d", i, expectedFirst[i].lsb, hmtx.HMetrics[i].LeftSideBearing)
+		}
+	}
+	if numGlyphs-numLHM > 0 {
+		last := len(hmtx.LeftSideBearing) - 1
+		if hmtx.LeftSideBearing[last] != expectedLastLSB {
+			t.Errorf("hmtx LeftSideBearing[last] want %d got %d", expectedLastLSB, hmtx.LeftSideBearing[last])
+		}
+	}
+
+	// Sample additional hmtx HMetrics entries for spot checks
+	sHMetrics := map[int]LongHorMetric{
+		0:     {AdvanceWidth: 1024, LeftSideBearing: 0},
+		1:     {AdvanceWidth: 0, LeftSideBearing: 0},
+		2:     {AdvanceWidth: 508, LeftSideBearing: 0},
+		3:     {AdvanceWidth: 635, LeftSideBearing: 0},
+		5600:  {AdvanceWidth: 1500, LeftSideBearing: 258},
+		5601:  {AdvanceWidth: 1500, LeftSideBearing: 321},
+		5602:  {AdvanceWidth: 1500, LeftSideBearing: 114},
+		5603:  {AdvanceWidth: 1500, LeftSideBearing: 192},
+		5698:  {AdvanceWidth: 1500, LeftSideBearing: 228},
+		5699:  {AdvanceWidth: 1500, LeftSideBearing: 237},
+		7942:  {AdvanceWidth: 1500, LeftSideBearing: 102},
+		7943:  {AdvanceWidth: 1500, LeftSideBearing: 84},
+		10956: {AdvanceWidth: 1500, LeftSideBearing: 487},
+	}
+	for ind, expected := range sHMetrics {
+		if ind >= len(hmtx.HMetrics) {
+			t.Errorf("hmtx HMetrics index %d out of range (length %d)", ind, len(hmtx.HMetrics))
+			continue
+		}
+		actual := hmtx.HMetrics[ind]
+		if actual.AdvanceWidth != expected.AdvanceWidth {
+			t.Errorf("hmtx HMetrics[%d].AdvanceWidth want %d got %d", ind, expected.AdvanceWidth, actual.AdvanceWidth)
+		}
+		if actual.LeftSideBearing != expected.LeftSideBearing {
+			t.Errorf("hmtx HMetrics[%d].LeftSideBearing want %d got %d", ind, expected.LeftSideBearing, actual.LeftSideBearing)
 		}
 	}
 }
