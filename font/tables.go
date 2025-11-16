@@ -1836,23 +1836,23 @@ type Hhea struct {
 
 func GetHhea(data []byte, pos int) (hhea *Hhea) {
 	hhea = &Hhea{
-		getFixed(data[pos : pos+2]),
-		getFWord(data[pos+2 : pos+4]),
+		getFixed(data[pos : pos+4]),
 		getFWord(data[pos+4 : pos+6]),
 		getFWord(data[pos+6 : pos+8]),
-		getUFWord(data[pos+8 : pos+10]),
-		getFWord(data[pos+10 : pos+12]),
+		getFWord(data[pos+8 : pos+10]),
+		getUFWord(data[pos+10 : pos+12]),
 		getFWord(data[pos+12 : pos+14]),
 		getFWord(data[pos+14 : pos+16]),
-		getInt16(data[pos+16 : pos+18]),
+		getFWord(data[pos+16 : pos+18]),
 		getInt16(data[pos+18 : pos+20]),
-		getFWord(data[pos+20 : pos+22]),
-		getInt16(data[pos+22 : pos+24]),
+		getInt16(data[pos+20 : pos+22]),
+		getFWord(data[pos+22 : pos+24]),
 		getInt16(data[pos+24 : pos+26]),
 		getInt16(data[pos+26 : pos+28]),
 		getInt16(data[pos+28 : pos+30]),
 		getInt16(data[pos+30 : pos+32]),
-		getUint16(data[pos+32 : pos+34]),
+		getInt16(data[pos+32 : pos+34]),
+		getUint16(data[pos+34 : pos+36]),
 	}
 	return
 }
