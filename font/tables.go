@@ -1891,13 +1891,48 @@ type nPairs struct {
 	Value int16  `json:"value"`
 }
 
-func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernPairs []*nPairs) {
+// KernFormat2ClassTable represents a class mapping table for format 2
+type KernFormat2ClassTable struct {
+	FirstGlyph uint16   `json:"firstGlyph"`
+	NGlyphs    uint16   `json:"nGlyphs"`
+	Offsets    []uint16 `json:"offsets"`
+}
+
+// KernFormat2 represents a format 2 kern subtable (simple n×m array)
+type KernFormat2 struct {
+	RowWidth         uint16                 `json:"rowWidth"`
+	LeftOffsetTable  uint16                 `json:"leftOffsetTable"`
+	RightOffsetTable uint16                 `json:"rightOffsetTable"`
+	ArrayOffset      uint16                 `json:"arrayOffset"`
+	LeftClassTable   *KernFormat2ClassTable `json:"leftClassTable,omitempty"`
+	RightClassTable  *KernFormat2ClassTable `json:"rightClassTable,omitempty"`
+}
+
+// KernFormat3 represents a format 3 kern subtable (simple n×m index array)
+type KernFormat3 struct {
+	GlyphCount      uint16  `json:"glyphCount"`
+	KernValueCount  uint8   `json:"kernValueCount"`
+	LeftClassCount  uint8   `json:"leftClassCount"`
+	RightClassCount uint8   `json:"rightClassCount"`
+	Flags           uint8   `json:"flags"`
+	KernValues      []int16 `json:"kernValues"`
+	LeftClass       []uint8 `json:"leftClass"`
+	RightClass      []uint8 `json:"rightClass"`
+	KernIndex       []uint8 `json:"kernIndex"`
+}
+
+func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernPairs []*nPairs, format2 *KernFormat2) {
 	subHeaders = make(map[string]int)
+	subtableStart := pos // Save subtable start position
 	subHeaders["version"] = int(getUint16(data[pos : pos+2]))
 	subHeaders["length"] = int(getUint16(data[pos+2 : pos+4]))
-	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
-	// Missing format 2
-	if subHeaders["version"] == 0 {
+	coverage := int(getUint16(data[pos+4 : pos+6]))
+	subHeaders["coverage"] = coverage
+	format := coverage & 0x00FF
+	subHeaders["format"] = format
+
+	if format == 0 {
+		// Format 0: ordered list of kerning pairs
 		subHeaders["nPairs"] = int(getUint16(data[pos+6 : pos+8]))
 		subHeaders["searchRange"] = int(getUint16(data[pos+8 : pos+10]))
 		subHeaders["entrySelector"] = int(getUint16(data[pos+10 : pos+12]))
@@ -1912,25 +1947,62 @@ func getWindowsKernTable(data []byte, pos int) (subHeaders map[string]int, kernP
 			})
 			pos += 6
 		}
+	} else if format == 2 {
+		// Format 2: simple n×m array of kerning values
+		format2 = new(KernFormat2)
+		format2.RowWidth = getUint16(data[pos+6 : pos+8])
+		format2.LeftOffsetTable = getUint16(data[pos+8 : pos+10])
+		format2.RightOffsetTable = getUint16(data[pos+10 : pos+12])
+		format2.ArrayOffset = getUint16(data[pos+12 : pos+14])
+
+		// Read left class table (offset from subtable start)
+		leftTablePos := subtableStart + int(format2.LeftOffsetTable)
+		format2.LeftClassTable = &KernFormat2ClassTable{
+			FirstGlyph: getUint16(data[leftTablePos : leftTablePos+2]),
+			NGlyphs:    getUint16(data[leftTablePos+2 : leftTablePos+4]),
+		}
+		leftTablePos += 4
+		for i := 0; i < int(format2.LeftClassTable.NGlyphs); i++ {
+			format2.LeftClassTable.Offsets = append(format2.LeftClassTable.Offsets,
+				getUint16(data[leftTablePos:leftTablePos+2]))
+			leftTablePos += 2
+		}
+
+		// Read right class table (offset from subtable start)
+		rightTablePos := subtableStart + int(format2.RightOffsetTable)
+		format2.RightClassTable = &KernFormat2ClassTable{
+			FirstGlyph: getUint16(data[rightTablePos : rightTablePos+2]),
+			NGlyphs:    getUint16(data[rightTablePos+2 : rightTablePos+4]),
+		}
+		rightTablePos += 4
+		for i := 0; i < int(format2.RightClassTable.NGlyphs); i++ {
+			format2.RightClassTable.Offsets = append(format2.RightClassTable.Offsets,
+				getUint16(data[rightTablePos:rightTablePos+2]))
+			rightTablePos += 2
+		}
 	}
 	return
 }
 
-func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]int, kernPairs []*nPairs) {
+func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]int, kernPairs []*nPairs, format2 *KernFormat2, format3 *KernFormat3) {
 	subHeaders = make(map[string]int)
+	subtableStart := pos // Save subtable start position
 	subHeaders["length"] = int(getUint32(data[pos : pos+4]))
-	subHeaders["coverage"] = int(getUint16(data[pos+4 : pos+6]))
+	coverage := int(getUint16(data[pos+4 : pos+6]))
+	subHeaders["coverage"] = coverage
 	tupleIndex := getUint16(data[pos+6 : pos+8])
 	subHeaders["tupleIndex"] = int(tupleIndex)
-	subHeaders["nPairs"] = int(getUint16(data[pos+8 : pos+10]))
-	subHeaders["searchRange"] = int(getUint16(data[pos+10 : pos+12]))
-	subHeaders["entrySelector"] = int(getUint16(data[pos+12 : pos+14]))
-	subHeaders["rangeShift"] = int(getUint16(data[pos+14 : pos+16]))
-	subHeaders["version"] = int(tupleIndex & 0x00FF)
-	pos += 16
-	if nTables == 1 {
-		// Not support table 2 3
-		if subHeaders["version"] == 0 {
+	format := coverage & 0x00FF
+	subHeaders["format"] = format
+
+	if format == 0 {
+		// Format 0: ordered list of kerning pairs
+		subHeaders["nPairs"] = int(getUint16(data[pos+8 : pos+10]))
+		subHeaders["searchRange"] = int(getUint16(data[pos+10 : pos+12]))
+		subHeaders["entrySelector"] = int(getUint16(data[pos+12 : pos+14]))
+		subHeaders["rangeShift"] = int(getUint16(data[pos+14 : pos+16]))
+		pos += 16
+		if nTables == 1 {
 			for i := 0; i < subHeaders["nPairs"]; i++ {
 				kernPairs = append(kernPairs, &nPairs{
 					getUint16(data[pos : pos+2]),
@@ -1940,16 +2012,86 @@ func getMacKernTable(data []byte, pos int, nTables int) (subHeaders map[string]i
 				pos += 6
 			}
 		}
+	} else if format == 2 {
+		// Format 2: simple n×m array of kerning values
+		format2 = new(KernFormat2)
+		format2.RowWidth = getUint16(data[pos+8 : pos+10])
+		format2.LeftOffsetTable = getUint16(data[pos+10 : pos+12])
+		format2.RightOffsetTable = getUint16(data[pos+12 : pos+14])
+		format2.ArrayOffset = getUint16(data[pos+14 : pos+16])
+
+		// Read left class table (offset from subtable start)
+		leftTablePos := subtableStart + int(format2.LeftOffsetTable)
+		format2.LeftClassTable = &KernFormat2ClassTable{
+			FirstGlyph: getUint16(data[leftTablePos : leftTablePos+2]),
+			NGlyphs:    getUint16(data[leftTablePos+2 : leftTablePos+4]),
+		}
+		leftTablePos += 4
+		for i := 0; i < int(format2.LeftClassTable.NGlyphs); i++ {
+			format2.LeftClassTable.Offsets = append(format2.LeftClassTable.Offsets,
+				getUint16(data[leftTablePos:leftTablePos+2]))
+			leftTablePos += 2
+		}
+
+		// Read right class table (offset from subtable start)
+		rightTablePos := subtableStart + int(format2.RightOffsetTable)
+		format2.RightClassTable = &KernFormat2ClassTable{
+			FirstGlyph: getUint16(data[rightTablePos : rightTablePos+2]),
+			NGlyphs:    getUint16(data[rightTablePos+2 : rightTablePos+4]),
+		}
+		rightTablePos += 4
+		for i := 0; i < int(format2.RightClassTable.NGlyphs); i++ {
+			format2.RightClassTable.Offsets = append(format2.RightClassTable.Offsets,
+				getUint16(data[rightTablePos:rightTablePos+2]))
+			rightTablePos += 2
+		}
+	} else if format == 3 {
+		// Format 3: simple n×m index array
+		format3 = new(KernFormat3)
+		format3.GlyphCount = getUint16(data[pos+8 : pos+10])
+		format3.KernValueCount = data[pos+10]
+		format3.LeftClassCount = data[pos+11]
+		format3.RightClassCount = data[pos+12]
+		format3.Flags = data[pos+13]
+		pos += 14
+
+		// Read kern values
+		for i := 0; i < int(format3.KernValueCount); i++ {
+			format3.KernValues = append(format3.KernValues, getFWord(data[pos:pos+2]))
+			pos += 2
+		}
+
+		// Read left class array
+		for i := 0; i < int(format3.GlyphCount); i++ {
+			format3.LeftClass = append(format3.LeftClass, data[pos])
+			pos++
+		}
+
+		// Read right class array
+		for i := 0; i < int(format3.GlyphCount); i++ {
+			format3.RightClass = append(format3.RightClass, data[pos])
+			pos++
+		}
+
+		// Read kern index array
+		indexCount := int(format3.LeftClassCount) * int(format3.RightClassCount)
+		for i := 0; i < indexCount; i++ {
+			format3.KernIndex = append(format3.KernIndex, data[pos])
+			pos++
+		}
 	}
+	// Note: Format 1 (state table) is not supported yet due to complexity
 	return
 }
 
 type Kern struct {
-	Version      int
-	NTables      int
-	SubHeaders   map[string]int
-	Pairs        []*nPairs
-	IsMacNewKern bool `json:"isNewKern,omitempty"`
+	Version      int            `json:"version"`
+	NTables      int            `json:"nTables"`
+	SubHeaders   map[string]int `json:"subHeaders"`
+	Pairs        []*nPairs      `json:"pairs,omitempty"`
+	Format2      *KernFormat2   `json:"format2,omitempty"`
+	Format3      *KernFormat3   `json:"format3,omitempty"`
+	IsMacNewKern bool           `json:"isNewKern,omitempty"`
 }
 
 func GetKern(data []byte, pos int) (kern *Kern, err error) {
@@ -1960,7 +2102,7 @@ func GetKern(data []byte, pos int) (kern *Kern, err error) {
 	kern.NTables = nTables
 	if version == 0 {
 		pos += 4
-		kern.SubHeaders, kern.Pairs = getWindowsKernTable(data, pos)
+		kern.SubHeaders, kern.Pairs, kern.Format2 = getWindowsKernTable(data, pos)
 		return
 	} else if version == 1 {
 		var isNewKern bool
@@ -1972,7 +2114,7 @@ func GetKern(data []byte, pos int) (kern *Kern, err error) {
 			pos += 4
 		}
 		kern.IsMacNewKern = isNewKern
-		kern.SubHeaders, kern.Pairs = getMacKernTable(data, pos, nTables)
+		kern.SubHeaders, kern.Pairs, kern.Format2, kern.Format3 = getMacKernTable(data, pos, nTables)
 		return
 	}
 
