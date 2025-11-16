@@ -272,6 +272,27 @@ func TestAllTable(t *testing.T) {
 		}
 	}
 
+	// Additional loca verification (moved from TestGetLocaFromFont):
+	// 1) Ensure length matches numGlyphs
+	if len(loca) != int(maxp.NumGlyphs) {
+		t.Fatalf("loca length mismatch: got %d want %d", len(loca), maxp.NumGlyphs)
+	}
+	// 2) Independently verify a few entries by reading raw uint32 offsets
+	// This font uses indexToLocFormat=1 (long format)
+	if head.IndexToLocFormat != 1 {
+		t.Fatalf("expected indexToLocFormat=1 for this font, got %d", head.IndexToLocFormat)
+	}
+	checkIdx := []int{0, 1, 2, 20, 30, 500, 1000, int(maxp.NumGlyphs) - 1}
+	base := int(locaInfo.Offset)
+	for _, i := range checkIdx {
+		off := base + i*4
+		got := loca[i]
+		want := int(binary.BigEndian.Uint32(fileByte[off : off+4]))
+		if got != want {
+			t.Fatalf("loca[%d] mismatch: got %d want %d", i, got, want)
+		}
+	}
+
 	// check glyph table
 	glyphInfo := tableContent["glyf"]
 	glyphs := GetGlyphs(fileByte, int(glyphInfo.Offset), loca, int(maxp.NumGlyphs))
@@ -292,10 +313,7 @@ func TestAllTable(t *testing.T) {
 		EndPtsOfContours []uint16 `json:"endPtsOfContours"`
 	}
 
-	type SPoint struct {
-		X int
-		Y int
-	}
+	// removed unused SPoint type
 
 	simp1 := glyphs.Simples[0]
 	sSimp1 := SGlyphSimple{
@@ -1717,5 +1735,32 @@ func TestGetKernMacFormat3(t *testing.T) {
 	expectedIndexCount := 2 * 2 // leftClassCount × rightClassCount
 	if len(kern.Format3.KernIndex) != expectedIndexCount {
 		t.Errorf("Expected %d kern index entries, got %d", expectedIndexCount, len(kern.Format3.KernIndex))
+	}
+}
+
+// TestGetLocaFromFont validates GetLoca against raw loca bytes (long format)
+// TestGetLocaFromFont merged into TestAllTable
+
+// TestGetLocaFormat0Synthetic verifies short format (indexToLocFormat=0)
+func TestGetLocaFormat0Synthetic(t *testing.T) {
+	// Create a synthetic loca table with 4 entries (numGlyphs=4)
+	// Offsets we want: [0, 20, 40, 60] -> stored as uint16 of offset/2: [0,10,20,30]
+	data := []byte{
+		0x00, 0x00,
+		0x00, 0x0A,
+		0x00, 0x14,
+		0x00, 0x1E,
+	}
+	numGlyphs := uint16(4)
+	indexToLocFormat := int16(0)
+	loca := GetLoca(data, 0, numGlyphs, indexToLocFormat)
+	want := []int{0, 20, 40, 60}
+	if len(loca) != len(want) {
+		t.Fatalf("loca length mismatch: got %d want %d", len(loca), len(want))
+	}
+	for i := range want {
+		if loca[i] != want[i] {
+			t.Fatalf("loca[%d] mismatch: got %d want %d", i, loca[i], want[i])
+		}
 	}
 }
