@@ -1104,13 +1104,19 @@ type NameRecord struct {
 	Offset             uint16 `json:"offset"`
 }
 
+type LangTagRecord struct {
+	Length uint16 `json:"length"`
+	Offset uint16 `json:"offset"`
+}
+
 type NameTable struct {
-	Format       uint16                       `json:"format`
-	Count        uint16                       `json:"count"`
-	StringOffset uint16                       `json:"stringOffset"`
-	NameRecord   []*NameRecord                `json:"nameRecord"`
-	LangTagCount uint16                       `json:"langTagCount"`
-	Info         map[string]map[string]string `json:"info"`
+	Format        uint16                       `json:"format"`
+	Count         uint16                       `json:"count"`
+	StringOffset  uint16                       `json:"stringOffset"`
+	NameRecord    []*NameRecord                `json:"nameRecord"`
+	LangTagCount  uint16                       `json:"langTagCount"`
+	LangTagRecord []*LangTagRecord             `json:"langTagRecord,omitempty"`
+	Info          map[string]map[string]string `json:"info"`
 }
 
 // macos languages
@@ -1763,6 +1769,7 @@ func getPlatformSpecific(platformID int, platformSpecificID int, languageID int)
 
 func GetName(data []byte, pos int) (nameTable *NameTable) {
 	nameTable = new(NameTable)
+	start := pos // Save table start position
 	// Need at least 6 bytes for header
 	if pos+6 > len(data) {
 		log.Printf("[WARNING] GetName: name table header truncated, need 6 bytes but only %d available at pos %d", len(data)-pos, pos)
@@ -1779,7 +1786,7 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 		return nameTable
 	}
 
-	stringOffset := pos + int(nameTable.StringOffset)
+	stringOffset := start + int(nameTable.StringOffset)
 	info := make(map[string]map[string]string)
 	for i := 0; i < count; i++ {
 		nameRecord := &NameRecord{
@@ -1825,9 +1832,32 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 	nameTable.Info = info
 
 	if int(nameTable.Format) == 1 {
-		// Windows langTagRecord is not finish
+		// Format 1 includes langTagRecord array
+		// pos is now at the end of nameRecords array
+		// In Format 1, langTag data comes after all nameRecords
+		// Need 2 bytes for langTagCount
+		if pos+2 > len(data) {
+			log.Printf("[WARNING] GetName: format 1 langTagCount truncated at pos %d", pos)
+			return nameTable
+		}
 		nameTable.LangTagCount = getUint16(data[pos : pos+2])
 		pos += 2
+
+		langTagCount := int(nameTable.LangTagCount)
+		if langTagCount < 0 || pos+langTagCount*4 > len(data) {
+			log.Printf("[WARNING] GetName: langTag records truncated or invalid count=%d, need %d bytes but only %d available at pos %d", langTagCount, langTagCount*4, len(data)-pos, pos)
+			return nameTable
+		}
+
+		// Parse each langTagRecord (4 bytes: length + offset)
+		for i := 0; i < langTagCount; i++ {
+			langTagRecord := &LangTagRecord{
+				Length: getUint16(data[pos : pos+2]),
+				Offset: getUint16(data[pos+2 : pos+4]),
+			}
+			nameTable.LangTagRecord = append(nameTable.LangTagRecord, langTagRecord)
+			pos += 4
+		}
 	}
 	return
 }
