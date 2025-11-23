@@ -2508,26 +2508,58 @@ type Meta struct {
 func GetMeta(data []byte, pos int) (meta *Meta, err error) {
 	start := pos
 	meta = new(Meta)
+
+	// Need at least 16 bytes for version, flags, dataOffset, numDataMaps
+	if pos+16 > len(data) {
+		err = errors.New("META table truncated")
+		return
+	}
+
 	meta.Version = getUint32(data[pos : pos+4])
 	pos += 4
 	if int(meta.Version) != 1 {
 		err = errors.New("unsupported META table version")
 		return
 	}
+
+	// Read header fields (ensure bounds above)
 	meta.Flags = getUint32(data[pos : pos+4])
 	meta.DataOffset = getUint32(data[pos+4 : pos+8])
 	meta.NumDataMaps = getUint32(data[pos+8 : pos+12])
 	pos += 12
 
 	num := int(meta.NumDataMaps)
+	if num < 0 {
+		err = errors.New("META numDataMaps negative")
+		return
+	}
+
+	// Each data map record is 12 bytes (tag(4) + offset(4) + length(4))
+	if pos+num*12 > len(data) {
+		err = errors.New("META data map records truncated")
+		return
+	}
+
 	tags := make(map[string]string)
 	for i := 0; i < num; i++ {
+		// ensure we can read a full record
+		if pos+12 > len(data) {
+			err = errors.New("META data map record truncated")
+			return
+		}
 		tag := FromCharCodeByte(data[pos : pos+4])
 		offset := getUint32(data[pos+4 : pos+8])
-		len := getUint32(data[pos+8 : pos+12])
+		length := getUint32(data[pos+8 : pos+12])
 		pos += 12
-		textS := start + int(offset)
-		text := FromCharCodeByte(data[textS : textS+int(len)])
+
+		// DataOffset points to the start of the data area (relative to table start).
+		// Each map's offset is relative to that data area. Resolve absolute position.
+		textS := start + int(meta.DataOffset) + int(offset)
+		if textS < 0 || textS+int(length) > len(data) {
+			err = errors.New("META tag data truncated or invalid offset/length")
+			return
+		}
+		text := FromCharCodeByte(data[textS : textS+int(length)])
 		tags[tag] = text
 	}
 	meta.Tags = tags
