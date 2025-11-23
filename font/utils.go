@@ -3,6 +3,7 @@ package font
 import (
 	"encoding/binary"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -105,6 +106,15 @@ func DecodeUTF8(data []byte, offset int, numBytes int) string {
 }
 
 func DecodeUTF16(data []byte, offset int, numBytes int) string {
+	// Bounds check
+	if offset < 0 || numBytes < 0 || offset+numBytes > len(data) {
+		log.Printf("[WARNING] DecodeUTF16: out of bounds, offset=%d numBytes=%d dataLen=%d", offset, numBytes, len(data))
+		return ""
+	}
+	// UTF-16 requires pairs of bytes
+	if numBytes%2 != 0 {
+		numBytes-- // truncate to even
+	}
 	codePoints := make([]uint16, numBytes/2)
 	for j := 0; j < len(codePoints); j++ {
 		codePoints[j] = getUint16(data[offset : offset+2])
@@ -146,22 +156,30 @@ var eightBitMacEncodings = map[string]string{
 func DecodeMACSTRING(data []byte, offset int, dataLength int, platformSpecifi string) string {
 	table, exists := eightBitMacEncodings[platformSpecifi]
 	if !exists {
+		log.Printf("[WARNING] DecodeMACSTRING: encoding not found for platformSpecific=%s", platformSpecifi)
 		return ""
 	}
 
-	var result string
+	// Bounds check
+	if offset < 0 || dataLength < 0 || offset+dataLength > len(data) {
+		log.Printf("[WARNING] DecodeMACSTRING: out of bounds, offset=%d dataLength=%d dataLen=%d", offset, dataLength, len(data))
+		return ""
+	}
+
+	var result strings.Builder
+	result.Grow(dataLength)
 	for i := 0; i < dataLength; i++ {
 		c := data[offset+i]
 		// In all eight-bit Mac encodings, the characters 0x00..0x7F are
 		// mapped to U+0000..U+007F; we only need to look up the others.
 		if c <= 0x7F {
-			result += string(rune(c))
+			result.WriteByte(c)
 		} else {
-			result += string(table[c&0x7F])
+			result.WriteRune(rune(table[c&0x7F]))
 		}
 	}
 
-	return result
+	return result.String()
 }
 
 func FromCharCode(data []int) string {
