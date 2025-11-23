@@ -2019,3 +2019,150 @@ func TestGetName(t *testing.T) {
 		t.Fatalf("expected 0 info entries on truncated string, got %d", len(nameTable.Info))
 	}
 }
+
+func TestGetNameFormat1(t *testing.T) {
+	// Test Format 1 with valid langTagRecords
+	// Create a simple name table with Format 1
+
+	// Layout per OpenType spec:
+	// offset 0: header (6 bytes)
+	// offset 6: nameRecords array (12 bytes each)
+	// offset 18: langTagCount + langTagRecords (Format 1 specific, comes right after nameRecords)
+	// offset 28: string storage (stringOffset points here)
+
+	var buf []byte
+
+	// Header (6 bytes)
+	buf = append(buf, 0x00, 0x01) // format = 1
+	buf = append(buf, 0x00, 0x01) // count = 1
+	buf = append(buf, 0x00, 0x1C) // stringOffset = 28 (6 header + 12 nameRecord + 10 langTag data)
+
+	// One nameRecord (12 bytes)
+	buf = append(buf, 0x00, 0x03) // platformID = 3 (Windows)
+	buf = append(buf, 0x00, 0x01) // platformSpecificID = 1 (Unicode BMP)
+	buf = append(buf, 0x00, 0x09) // languageID = 0x0009 (English)
+	buf = append(buf, 0x00, 0x01) // nameID = 1 (Font Family)
+	buf = append(buf, 0x00, 0x0A) // length = 10 bytes (5 UTF-16 chars)
+	buf = append(buf, 0x00, 0x00) // offset = 0 (relative to stringOffset)
+
+	// Now at offset 18: Format 1 langTag section
+	buf = append(buf, 0x00, 0x02) // langTagCount = 2
+
+	// LangTagRecord 0 (4 bytes)
+	buf = append(buf, 0x00, 0x0A) // length = 10 bytes
+	buf = append(buf, 0x00, 0x0A) // offset = 10 (relative to string storage)
+
+	// LangTagRecord 1 (4 bytes)
+	buf = append(buf, 0x00, 0x0A) // length = 10 bytes
+	buf = append(buf, 0x00, 0x14) // offset = 20 (relative to string storage)
+
+	// Now at offset 28: String storage area
+	// Font family name: "Arial" in UTF-16BE (10 bytes)
+	buf = append(buf, 0x00, 0x41) // 'A'
+	buf = append(buf, 0x00, 0x72) // 'r'
+	buf = append(buf, 0x00, 0x69) // 'i'
+	buf = append(buf, 0x00, 0x61) // 'a'
+	buf = append(buf, 0x00, 0x6C) // 'l'
+
+	// Lang tag strings (part of string storage)
+	buf = append(buf, []byte("en-Latn-US")...) // 10 bytes at offset 10
+	buf = append(buf, []byte("zh-Hans-CN")...) // 10 bytes at offset 20
+
+	nameTable := GetName(buf, 0)
+
+	// Verify Format 1 was parsed
+	if nameTable.Format != 1 {
+		t.Errorf("expected Format=1, got %d", nameTable.Format)
+	}
+
+	if nameTable.Count != 1 {
+		t.Errorf("expected Count=1, got %d", nameTable.Count)
+	}
+
+	if nameTable.LangTagCount != 2 {
+		t.Errorf("expected LangTagCount=2, got %d", nameTable.LangTagCount)
+	}
+
+	if len(nameTable.LangTagRecord) != 2 {
+		t.Fatalf("expected 2 LangTagRecords, got %d", len(nameTable.LangTagRecord))
+	}
+
+	// Verify first langTagRecord
+	if nameTable.LangTagRecord[0].Length != 10 {
+		t.Errorf("langTagRecord[0] Length expected 10, got %d", nameTable.LangTagRecord[0].Length)
+	}
+	if nameTable.LangTagRecord[0].Offset != 10 {
+		t.Errorf("langTagRecord[0] Offset expected 10, got %d", nameTable.LangTagRecord[0].Offset)
+	}
+
+	// Verify second langTagRecord
+	if nameTable.LangTagRecord[1].Length != 10 {
+		t.Errorf("langTagRecord[1] Length expected 10, got %d", nameTable.LangTagRecord[1].Length)
+	}
+	if nameTable.LangTagRecord[1].Offset != 20 {
+		t.Errorf("langTagRecord[1] Offset expected 20, got %d", nameTable.LangTagRecord[1].Offset)
+	}
+
+	// Verify name was decoded
+	if len(nameTable.Info) == 0 {
+		t.Error("expected Info to have entries")
+	}
+	if family, exists := nameTable.Info["fontFamily"]; exists {
+		if enUS, exists := family["en"]; exists {
+			if enUS != "Arial" {
+				t.Errorf("expected fontFamily 'Arial', got '%s'", enUS)
+			}
+		} else {
+			t.Errorf("expected 'en' language in fontFamily, got languages: %v", family)
+		}
+	} else {
+		t.Error("expected 'fontFamily' in Info")
+	}
+}
+
+func TestGetNameFormat1Truncated(t *testing.T) {
+	// Test Format 1 with truncated langTagCount
+	buf := []byte{
+		0x00, 0x01, // format = 1
+		0x00, 0x00, // count = 0
+		0x00, 0x06, // stringOffset = 6
+		// langTagCount truncated - missing bytes
+	}
+	nameTable := GetName(buf, 0)
+	if nameTable == nil {
+		t.Fatalf("expected non-nil on truncated langTagCount")
+	}
+	// Should handle gracefully
+
+	// Test Format 1 with truncated langTagRecords
+	buf2 := []byte{
+		0x00, 0x01, // format = 1
+		0x00, 0x00, // count = 0
+		0x00, 0x06, // stringOffset = 6
+		0x00, 0x02, // langTagCount = 2
+		// only space for 1 langTagRecord (4 bytes), not 2
+		0x00, 0x05,
+		0x00, 0x00,
+	}
+	nameTable2 := GetName(buf2, 0)
+	if nameTable2 == nil {
+		t.Fatalf("expected non-nil on truncated langTagRecords")
+	}
+	// Should have returned early with empty LangTagRecord array
+	if len(nameTable2.LangTagRecord) != 0 {
+		t.Errorf("expected 0 langTagRecords on truncation, got %d", len(nameTable2.LangTagRecord))
+	}
+
+	// Test Format 1 with negative langTagCount (overflow)
+	buf3 := []byte{
+		0x00, 0x01, // format = 1
+		0x00, 0x00, // count = 0
+		0x00, 0x06, // stringOffset = 6
+		0xFF, 0xFF, // langTagCount = 65535 (will cause overflow in bounds check)
+	}
+	nameTable3 := GetName(buf3, 0)
+	if nameTable3 == nil {
+		t.Fatalf("expected non-nil on huge langTagCount")
+	}
+	// Should detect overflow and return early
+}
