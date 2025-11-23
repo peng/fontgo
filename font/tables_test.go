@@ -1187,6 +1187,66 @@ func TestAllTable(t *testing.T) {
 			t.Errorf("hmtx HMetrics[%d].LeftSideBearing want %d got %d", ind, expected.LeftSideBearing, actual.LeftSideBearing)
 		}
 	}
+
+	// check name table
+	nameInfo := tableContent["name"]
+	if nameInfo == nil {
+		t.Fatalf("name table not found")
+	}
+
+	nameTable := GetName(fileByte, int(nameInfo.Offset))
+	if nameTable == nil {
+		t.Fatalf("GetName returned nil")
+	}
+
+	// Verify basic structure
+	if nameTable.Format != 0 {
+		t.Errorf("name Format want 0 got %d", nameTable.Format)
+	}
+	if nameTable.Count != 16 {
+		t.Errorf("name Count want 16 got %d", nameTable.Count)
+	}
+	if nameTable.StringOffset != 198 {
+		t.Errorf("name StringOffset want 198 got %d", nameTable.StringOffset)
+	}
+	if len(nameTable.NameRecord) != 16 {
+		t.Errorf("name expected 16 nameRecords got %d", len(nameTable.NameRecord))
+	}
+
+	// Verify first record
+	rec0 := nameTable.NameRecord[0]
+	if rec0.PlatformID != 3 {
+		t.Errorf("name record 0 PlatformID want 3 got %d", rec0.PlatformID)
+	}
+	if rec0.PlatformSpecificID != 1 {
+		t.Errorf("name record 0 PlatformSpecificID want 1 got %d", rec0.PlatformSpecificID)
+	}
+	if rec0.LanguageID != 1028 {
+		t.Errorf("name record 0 LanguageID want 1028 got %d", rec0.LanguageID)
+	}
+	if rec0.NameID != 1 {
+		t.Errorf("name record 0 NameID want 1 got %d", rec0.NameID)
+	}
+
+	// Verify parsed info contains expected keys
+	expectedKeys := []string{"fontFamily", "copyright", "version", "postScriptName"}
+	for _, key := range expectedKeys {
+		if _, exists := nameTable.Info[key]; !exists {
+			t.Errorf("name expected key %q in Info", key)
+		}
+	}
+
+	// Verify some specific values exist
+	if family, exists := nameTable.Info["fontFamily"]; exists {
+		if _, hasEn := family["en-US"]; !hasEn {
+			t.Errorf("name expected fontFamily to have en-US entry")
+		}
+		if _, hasZh := family["zh"]; !hasZh {
+			t.Errorf("name expected fontFamily to have zh entry")
+		}
+	} else {
+		t.Errorf("name fontFamily not found in Info")
+	}
 }
 
 func TestGetFvar(t *testing.T) {
@@ -1907,5 +1967,55 @@ func TestGetMeta(t *testing.T) {
 	_, err = GetMeta(truncatedData, 0)
 	if err == nil {
 		t.Fatalf("expected error for truncated tag data, got nil")
+	}
+}
+
+// TestGetName verifies GetName handles truncated/malformed data safely.
+func TestGetName(t *testing.T) {
+	// Test truncated header
+	shortHeader := []byte{0x00, 0x00}
+	nameTable := GetName(shortHeader, 0)
+	if nameTable == nil {
+		t.Fatalf("expected non-nil on truncated header")
+	}
+	// should return empty but not panic
+
+	// Test truncated records (count=1 but no record bytes)
+	badRecords := []byte{
+		0x00, 0x00,
+		0x00, 0x01, // count = 1
+		0x00, 0x06, // stringOffset
+		// missing 12 bytes for record
+	}
+	nameTable = GetName(badRecords, 0)
+	if nameTable == nil {
+		t.Fatalf("expected non-nil on truncated records")
+	}
+	if len(nameTable.NameRecord) != 0 {
+		t.Fatalf("expected 0 records on truncated, got %d", len(nameTable.NameRecord))
+	}
+
+	// Test string data points beyond end
+	truncatedString := []byte{
+		0x00, 0x00,
+		0x00, 0x01,
+		0x00, 0x12,
+		// nameRecord
+		0x00, 0x03,
+		0x00, 0x01,
+		0x04, 0x09,
+		0x00, 0x01,
+		0x00, 0x64, // length = 100 -> beyond provided data
+		0x00, 0x00,
+		// only a few bytes after
+		'a', 'b', 'c',
+	}
+	nameTable = GetName(truncatedString, 0)
+	if nameTable == nil {
+		t.Fatalf("expected non-nil on truncated string")
+	}
+	// Should skip the record with out-of-bounds string
+	if len(nameTable.Info) != 0 {
+		t.Fatalf("expected 0 info entries on truncated string, got %d", len(nameTable.Info))
 	}
 }
