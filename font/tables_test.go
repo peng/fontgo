@@ -1840,3 +1840,72 @@ func TestGetItag(t *testing.T) {
 		t.Fatalf("expected error for truncated tag data, got nil")
 	}
 }
+
+// TestGetMeta verifies GetMeta parses a simple META table and returns errors on truncated data.
+func TestGetMeta(t *testing.T) {
+	// Build a valid meta table with one data map. Layout:
+	// version(4)=1, flags(4)=0, dataOffset(4)=28, numDataMaps(4)=1
+	// map: tag(4)='name', offset(4)=0, length(4)=5
+	// data area (starting at byte 28): 'hello'
+	valid := []byte{
+		0x00, 0x00, 0x00, 0x01, // version = 1
+		0x00, 0x00, 0x00, 0x00, // flags
+		0x00, 0x00, 0x00, 0x1C, // dataOffset = 28
+		0x00, 0x00, 0x00, 0x01, // numDataMaps = 1
+		// data map record (12 bytes)
+		'n', 'a', 'm', 'e', // tag
+		0x00, 0x00, 0x00, 0x00, // offset = 0 (relative to dataOffset)
+		0x00, 0x00, 0x00, 0x05, // length = 5
+		// data area (5 bytes)
+		'h', 'e', 'l', 'l', 'o',
+	}
+
+	meta, err := GetMeta(valid, 0)
+	if err != nil {
+		t.Fatalf("GetMeta valid returned error: %v", err)
+	}
+	if meta == nil {
+		t.Fatalf("GetMeta valid returned nil meta")
+	}
+	if int(meta.NumDataMaps) != 1 {
+		t.Fatalf("expected NumDataMaps=1 got %d", meta.NumDataMaps)
+	}
+	if meta.Tags["name"] != "hello" {
+		t.Fatalf("expected tag 'name' -> 'hello', got %q", meta.Tags["name"])
+	}
+
+	// Truncated header
+	shortHeader := []byte{0x00, 0x00, 0x00}
+	_, err = GetMeta(shortHeader, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated header, got nil")
+	}
+
+	// Truncated data map (numDataMaps=1 but missing 12 bytes)
+	badMaps := []byte{
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, // numDataMaps = 1
+		// missing map bytes
+	}
+	_, err = GetMeta(badMaps, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated maps, got nil")
+	}
+
+	// Map points beyond data area
+	truncatedData := []byte{
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x10, // dataOffset = 16
+		0x00, 0x00, 0x00, 0x01, // numDataMaps = 1
+		't', 'a', 'g', '1',
+		0x00, 0x00, 0x00, 0x10, // offset = 16
+		0x00, 0x00, 0x00, 0x10, // length = 16 -> beyond provided bytes
+		'a', 'b', 'c',
+	}
+	_, err = GetMeta(truncatedData, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated tag data, got nil")
+	}
+}
