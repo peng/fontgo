@@ -2455,23 +2455,43 @@ type Itag struct {
 func GetItag(data []byte, pos int) (itag *Itag, err error) {
 	start := pos
 	itag = new(Itag)
-	itag.Version = getUint32(data[pos : pos+4])
-
-	if int(itag.Version) != 1 {
-		err = errors.New("unsupported ltag table version")
+	// basic bounds: need at least 12 bytes for version, flags, numTags
+	if pos+12 > len(data) {
+		err = errors.New("itag table truncated")
 		return
 	}
 
-	// skip flags
+	itag.Version = getUint32(data[pos : pos+4])
+
+	if int(itag.Version) != 1 {
+		err = errors.New("unsupported itag table version")
+		return
+	}
+
+	// skip flags -> read numTags at offset pos+8
 	itag.NumTags = getUint32(data[pos+8 : pos+12])
 	pos += 12
 	num := int(itag.NumTags)
+	// ensure tag record table fits
+	if num < 0 || pos+num*4 > len(data) {
+		err = errors.New("itag tag records truncated or invalid numTags")
+		return
+	}
 
+	itag.TagRange = make([]string, 0, num)
 	for i := 0; i < num; i++ {
-		offset := start + int(getUint16(data[pos:pos+2]))
-		len := int(getUint16(data[pos+2 : pos+4]))
+		// each record: uint16 offset, uint16 length (offset relative to start)
+		off16 := getUint16(data[pos : pos+2])
+		ln16 := getUint16(data[pos+2 : pos+4])
+		offset := start + int(off16)
+		l := int(ln16)
 		pos += 4
-		tag := FromCharCodeByte(data[offset : offset+len])
+
+		if offset < 0 || l < 0 || offset+l > len(data) {
+			err = errors.New("itag tag data truncated or invalid offset/length")
+			return
+		}
+		tag := FromCharCodeByte(data[offset : offset+l])
 		itag.TagRange = append(itag.TagRange, tag)
 	}
 	return
