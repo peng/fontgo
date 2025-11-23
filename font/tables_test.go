@@ -1764,3 +1764,79 @@ func TestGetLocaFormat0Synthetic(t *testing.T) {
 		}
 	}
 }
+
+// TestGetItag verifies GetItag parses a simple itag table and returns errors on truncated data.
+func TestGetItag(t *testing.T) {
+	// Construct a valid itag table with two tags: "cat" and "doll"
+	// layout:
+	// version (4) = 1
+	// flags (4) = 0
+	// numTags (4) = 2
+	// record1: offset(uint16)=20, len(uint16)=3
+	// record2: offset(uint16)=23, len(uint16)=4
+	// data at 20: "cat" (3 bytes)
+	// data at 23: "doll" (4 bytes)
+	valid := []byte{
+		0x00, 0x00, 0x00, 0x01, // version
+		0x00, 0x00, 0x00, 0x00, // flags
+		0x00, 0x00, 0x00, 0x02, // numTags = 2
+		0x00, 0x14, // rec1 offset = 20
+		0x00, 0x03, // rec1 len = 3
+		0x00, 0x17, // rec2 offset = 23
+		0x00, 0x04, // rec2 len = 4
+		// tag bytes (start at index 20)
+		'c', 'a', 't',
+		'd', 'o', 'l', 'l',
+	}
+
+	itag, err := GetItag(valid, 0)
+	if err != nil {
+		t.Fatalf("GetItag valid returned error: %v", err)
+	}
+	if itag == nil {
+		t.Fatalf("GetItag valid returned nil itag")
+	}
+	if int(itag.NumTags) != 2 {
+		t.Fatalf("expected NumTags=2 got %d", itag.NumTags)
+	}
+	if len(itag.TagRange) != 2 {
+		t.Fatalf("expected 2 tags got %d", len(itag.TagRange))
+	}
+	if itag.TagRange[0] != "cat" || itag.TagRange[1] != "doll" {
+		t.Fatalf("unexpected tags: %v", itag.TagRange)
+	}
+
+	// Truncated header (less than 12 bytes)
+	shortHeader := []byte{0x00, 0x00, 0x00}
+	_, err = GetItag(shortHeader, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated header, got nil")
+	}
+
+	// Truncated records: numTags claims 1 but no record bytes present
+	badRecords := []byte{
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, // numTags = 1
+		// missing 4 bytes for record
+	}
+	_, err = GetItag(badRecords, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated records, got nil")
+	}
+
+	// Truncated tag data: record points beyond data end
+	truncatedData := []byte{
+		0x00, 0x00, 0x00, 0x01, // version
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, // numTags = 1
+		0x00, 0x10, // offset = 16
+		0x00, 0x10, // len = 16 -> offset+len=32 but data shorter
+		// only provide a few bytes after
+		'a', 'b', 'c',
+	}
+	_, err = GetItag(truncatedData, 0)
+	if err == nil {
+		t.Fatalf("expected error for truncated tag data, got nil")
+	}
+}
