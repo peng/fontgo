@@ -2,6 +2,7 @@ package font
 
 import (
 	"errors"
+	"log"
 	"strconv"
 )
 
@@ -1762,12 +1763,21 @@ func getPlatformSpecific(platformID int, platformSpecificID int, languageID int)
 
 func GetName(data []byte, pos int) (nameTable *NameTable) {
 	nameTable = new(NameTable)
+	// Need at least 6 bytes for header
+	if pos+6 > len(data) {
+		log.Printf("[WARNING] GetName: name table header truncated, need 6 bytes but only %d available at pos %d", len(data)-pos, pos)
+		return nameTable
+	}
 	nameTable.Format = getUint16(data[pos : pos+2])
 	nameTable.Count = getUint16(data[pos+2 : pos+4])
 	nameTable.StringOffset = getUint16(data[pos+4 : pos+6])
 	pos += 6
 
 	count := int(nameTable.Count)
+	if count < 0 || pos+count*12 > len(data) {
+		log.Printf("[WARNING] GetName: name records truncated or invalid count=%d, need %d bytes but only %d available at pos %d", count, count*12, len(data)-pos, pos)
+		return nameTable
+	}
 
 	stringOffset := pos + int(nameTable.StringOffset)
 	info := make(map[string]map[string]string)
@@ -1785,14 +1795,22 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 
 		property := nameTableNames[int(nameRecord.NameID)]
 		language := getLangCode(int(nameRecord.PlatformID), int(nameRecord.LanguageID))
-		platformSpecifi := getPlatformSpecific(int(nameRecord.LanguageID), int(nameRecord.PlatformSpecificID), int(nameRecord.LanguageID))
+		platformSpecifi := getPlatformSpecific(int(nameRecord.PlatformID), int(nameRecord.PlatformSpecificID), int(nameRecord.LanguageID))
 
 		if platformSpecifi != "" && language != "" {
+			// Validate string bounds
+			textStart := stringOffset + int(nameRecord.Offset)
+			textLen := int(nameRecord.Length)
+			if textStart < 0 || textLen < 0 || textStart+textLen > len(data) {
+				log.Printf("[WARNING] GetName: name record %d string data out of bounds, textStart=%d textLen=%d dataLen=%d (nameID=%d platformID=%d)", i, textStart, textLen, len(data), nameRecord.NameID, nameRecord.PlatformID)
+				continue
+			}
+
 			var text string
 			if platformSpecifi == eumnUtf16 {
-				text = DecodeUTF16(data, stringOffset+int(nameRecord.Offset), int(nameRecord.Length))
+				text = DecodeUTF16(data, textStart, textLen)
 			} else {
-				text = DecodeMACSTRING(data, stringOffset+int(nameRecord.Offset), int(nameRecord.Length), platformSpecifi)
+				text = DecodeMACSTRING(data, textStart, textLen, platformSpecifi)
 			}
 
 			if text != "" {
@@ -2373,11 +2391,13 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 	axisCount := int(fvar.AxisCount)
 	axisSize := int(fvar.AxisSize)
 	if axesTotal := pos + axesCountTotalSize(axisCount, axisSize); axesTotal > len(data) {
+		log.Printf("[WARNING] GetFvar: axes data truncated, need %d bytes but only %d available at pos %d", axesCountTotalSize(axisCount, axisSize), len(data)-pos, pos)
 		return nil
 	}
 
 	for i := 0; i < axisCount; i++ {
 		if pos+20 > len(data) { // each axis record expected 20 bytes
+			log.Printf("[WARNING] GetFvar: axis record %d truncated, need 20 bytes but only %d available at pos %d", i, len(data)-pos, pos)
 			return nil
 		}
 		fvar.Axis = append(fvar.Axis, &SfntVariationAxis{
@@ -2405,6 +2425,7 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 
 	for i := 0; i < instanceCount; i++ {
 		if pos+instSize > len(data) {
+			log.Printf("[WARNING] GetFvar: instance record %d truncated, need %d bytes but only %d available at pos %d", i, instSize, len(data)-pos, pos)
 			return nil
 		}
 		start := pos
@@ -2414,6 +2435,7 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 		coords := make([]uint32, axisCount)
 		for c := 0; c < axisCount; c++ {
 			if pos+4 > len(data) {
+				log.Printf("[WARNING] GetFvar: instance %d coordinate %d truncated at pos %d", i, c, pos)
 				return nil
 			}
 			coords[c] = getFixed32(data[pos : pos+4])
