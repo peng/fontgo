@@ -1247,6 +1247,81 @@ func TestAllTable(t *testing.T) {
 	} else {
 		t.Errorf("name fontFamily not found in Info")
 	}
+
+	// test post table
+	postInfo, ok := tableContent["post"]
+	if !ok {
+		t.Error("post table not found")
+		return
+	}
+
+	post := GetPost(fileByte, int(postInfo.Offset))
+	if post == nil {
+		t.Error("post GetPost returned nil")
+		return
+	}
+
+	// Based on the expected values from comment:
+	// format: 2, italicAngle: 0, underlinePosition: -217, underlineThickness: 150
+	// isFixedPitch: 0, minMemType42: 0, maxMemType42: 0, minMemType1: 0, maxMemType1: 0
+	if post.Format != 2.0 {
+		t.Errorf("post Format want 2.0 got %f", post.Format)
+	}
+
+	if post.ItalicAngle != 0 {
+		t.Errorf("post ItalicAngle want 0 got %f", post.ItalicAngle)
+	}
+
+	if post.UnderlinePosition != -217 {
+		t.Errorf("post UnderlinePosition want -217 got %d", post.UnderlinePosition)
+	}
+
+	if post.UnderlineThickness != 150 {
+		t.Errorf("post UnderlineThickness want 150 got %d", post.UnderlineThickness)
+	}
+
+	if post.IsFixedPitch != 0 {
+		t.Errorf("post IsFixedPitch want 0 got %d", post.IsFixedPitch)
+	}
+
+	if post.MinMemType42 != 0 {
+		t.Errorf("post MinMemType42 want 0 got %d", post.MinMemType42)
+	}
+
+	if post.MaxMemType42 != 0 {
+		t.Errorf("post MaxMemType42 want 0 got %d", post.MaxMemType42)
+	}
+
+	if post.MinMemType1 != 0 {
+		t.Errorf("post MinMemType1 want 0 got %d", post.MinMemType1)
+	}
+
+	if post.MaxMemType1 != 0 {
+		t.Errorf("post MaxMemType1 want 0 got %d", post.MaxMemType1)
+	}
+
+	// Format 2 should have numberOfGlyphs and glyphNameIndex
+	if post.NumberOfGlyphs == 0 {
+		t.Error("post Format 2 should have numberOfGlyphs > 0")
+	}
+
+	if len(post.GlyphNameIndex) == 0 {
+		t.Error("post Format 2 should have glyphNameIndex array")
+	}
+
+	/*
+		{
+			format: 2,
+			isFixedPitch: 0,
+			italicAngle: 0,
+			maxMemType1: 0,
+			maxMemType42: 0,
+			minMemType1: 0,
+			minMemType42: 0,
+			underlinePosition: -217,
+			underlineThickness: 150,
+		}
+	*/
 }
 
 func TestGetFvar(t *testing.T) {
