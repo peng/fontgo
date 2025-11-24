@@ -2328,6 +2328,13 @@ type Post struct {
 }
 
 func GetPost(data []byte, pos int) (post *Post) {
+	post = new(Post)
+	// Basic header is 32 bytes
+	if pos+32 > len(data) {
+		log.Printf("[WARNING] GetPost: table header truncated, need 32 bytes but only %d available at pos %d", len(data)-pos, pos)
+		return post
+	}
+
 	post.Format = getFixed(data[pos : pos+4])
 	post.ItalicAngle = getFixed(data[pos+4 : pos+8])
 	post.UnderlinePosition = getFWord(data[pos+8 : pos+10])
@@ -2342,30 +2349,62 @@ func GetPost(data []byte, pos int) (post *Post) {
 	format := post.Format
 
 	if format == 1 {
+		// Format 1: Standard Macintosh ordering (258 glyphs)
 		post.Names = standardNames
 	} else if format == 2 {
+		// Format 2: Custom glyph names
+		if pos+2 > len(data) {
+			log.Printf("[WARNING] GetPost: format 2 numberOfGlyphs truncated at pos %d", pos)
+			return post
+		}
 		post.NumberOfGlyphs = getUint16(data[pos : pos+2])
 		pos += 2
 		numberOfGlyphs := int(post.NumberOfGlyphs)
+
+		// Check glyphNameIndex array bounds
+		if numberOfGlyphs < 0 || pos+numberOfGlyphs*2 > len(data) {
+			log.Printf("[WARNING] GetPost: format 2 glyphNameIndex array truncated, need %d bytes but only %d available at pos %d", numberOfGlyphs*2, len(data)-pos, pos)
+			return post
+		}
+
 		for i := 0; i < numberOfGlyphs; i++ {
 			post.GlyphNameIndex = append(post.GlyphNameIndex, getUint16(data[pos:pos+2]))
 			pos += 2
 		}
 
+		// Read custom glyph names
 		for i := 0; i < numberOfGlyphs; i++ {
-			// post.Names = append(post.Names, get)
 			if int(post.GlyphNameIndex[i]) >= len(standardNames) {
+				if pos+1 > len(data) {
+					log.Printf("[WARNING] GetPost: format 2 custom name length truncated at pos %d for glyph %d", pos, i)
+					break
+				}
 				nameLen := int(getInt8(data[pos : pos+1]))
 				pos++
 
+				if nameLen < 0 || pos+nameLen > len(data) {
+					log.Printf("[WARNING] GetPost: format 2 custom name data truncated, need %d bytes but only %d available at pos %d for glyph %d", nameLen, len(data)-pos, pos, i)
+					break
+				}
 				post.Names = append(post.Names, FromCharCodeByte(data[pos:pos+nameLen]))
 				pos += nameLen
 			}
 		}
 	} else if format == 2.5 {
+		// Format 2.5: Variation on format 2 (deprecated)
+		if pos+2 > len(data) {
+			log.Printf("[WARNING] GetPost: format 2.5 numberOfGlyphs truncated at pos %d", pos)
+			return post
+		}
 		post.NumberOfGlyphs = getUint16(data[pos : pos+2])
 		pos += 2
 		numberOfGlyphs := int(post.NumberOfGlyphs)
+
+		if numberOfGlyphs < 0 || pos+numberOfGlyphs > len(data) {
+			log.Printf("[WARNING] GetPost: format 2.5 offset array truncated, need %d bytes but only %d available at pos %d", numberOfGlyphs, len(data)-pos, pos)
+			return post
+		}
+
 		for i := 0; i < numberOfGlyphs; i++ {
 			post.Offset = append(post.Offset, getInt8(data[pos:pos+1]))
 			pos++
