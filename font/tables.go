@@ -2537,39 +2537,39 @@ func axesCountTotalSize(axisCount int, axisSize int) int {
 	return axisCount * axisSize
 }
 
-type Itag struct {
+type Ltag struct {
 	Version  uint32   `json:"version"`
 	NumTags  uint32   `json:"numTags"`
 	TagRange []string `json:"tagRange"`
 }
 
-func GetItag(data []byte, pos int) (itag *Itag, err error) {
+func GetItag(data []byte, pos int) (ltag *Ltag, err error) {
 	start := pos
-	itag = new(Itag)
+	ltag = new(Ltag)
 	// basic bounds: need at least 12 bytes for version, flags, numTags
 	if pos+12 > len(data) {
-		err = errors.New("itag table truncated")
+		err = errors.New("ltag table truncated")
 		return
 	}
 
-	itag.Version = getUint32(data[pos : pos+4])
+	ltag.Version = getUint32(data[pos : pos+4])
 
-	if int(itag.Version) != 1 {
-		err = errors.New("unsupported itag table version")
+	if int(ltag.Version) != 1 {
+		err = errors.New("unsupported ltag table version")
 		return
 	}
 
 	// skip flags -> read numTags at offset pos+8
-	itag.NumTags = getUint32(data[pos+8 : pos+12])
+	ltag.NumTags = getUint32(data[pos+8 : pos+12])
 	pos += 12
-	num := int(itag.NumTags)
+	num := int(ltag.NumTags)
 	// ensure tag record table fits
 	if num < 0 || pos+num*4 > len(data) {
-		err = errors.New("itag tag records truncated or invalid numTags")
+		err = errors.New("ltag tag records truncated or invalid numTags")
 		return
 	}
 
-	itag.TagRange = make([]string, 0, num)
+	ltag.TagRange = make([]string, 0, num)
 	for i := 0; i < num; i++ {
 		// each record: uint16 offset, uint16 length (offset relative to start)
 		off16 := getUint16(data[pos : pos+2])
@@ -2579,11 +2579,11 @@ func GetItag(data []byte, pos int) (itag *Itag, err error) {
 		pos += 4
 
 		if offset < 0 || l < 0 || offset+l > len(data) {
-			err = errors.New("itag tag data truncated or invalid offset/length")
+			err = errors.New("ltag tag data truncated or invalid offset/length")
 			return
 		}
 		tag := FromCharCodeByte(data[offset : offset+l])
-		itag.TagRange = append(itag.TagRange, tag)
+		ltag.TagRange = append(ltag.TagRange, tag)
 	}
 	return
 }
