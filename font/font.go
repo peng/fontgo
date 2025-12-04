@@ -12,7 +12,7 @@ type TagItem struct {
 
 type Tables struct {
 	Head *Head      `json:"head"`
-	Maxp *Maxp      `json:"maxp`
+	Maxp *Maxp      `json:"maxp"`
 	Loca []int      `json:"loca"`
 	Cmap *Cmap      `json:"cmap,omitempty"`
 	Name *NameTable `json:"name,omitempty"`
@@ -22,25 +22,33 @@ type Tables struct {
 	Os2  *OS2       `json:"os2"`
 	Post *Post      `json:"post"`
 	Fvar *Fvar      `json:"fvar"`
-	Itag *Itag      `json:"itag,omitempty"`
+	Ltag *Ltag      `json:"ltag,omitempty"`
 	Meta *Meta      `json:"meta"`
 }
 
-type Directory struct {
+type FontInfo struct {
 	OffsetTable  *OffsetTable        `json:"offsetTable"`
 	TableContent map[string]*TagItem `json:"tableContent"`
 	Tables       *Tables             `json:"tables"`
 	Glyphs       *Glyphs             `json:"glyphs"`
 }
 
-func DataReader(filePath string) (directory *Directory, err error) {
-	var fileByte []byte
-	fileByte, err = os.ReadFile(filePath)
+type Font struct {
+	fileByte []byte
+	filePath string
+}
 
-	if err != nil {
-		return
+
+func ReadFontFile(filePath string) (f *Font, err error) {
+	f = &Font{
+		filePath: filePath,
 	}
+	f.fileByte, err = os.ReadFile(filePath)
+	return
+}
 
+func (f *Font) GetFontInfo() (fontInfo *FontInfo, err error) {
+	fileByte := f.fileByte
 	// read offset table
 	offsetTable := GetOffsetTable(fileByte)
 
@@ -59,7 +67,7 @@ func DataReader(filePath string) (directory *Directory, err error) {
 	os2Info, existOs2 := tableContent["OS/2"]
 	postInfo, existPost := tableContent["post"]
 	fvarInfo, existFvar := tableContent["fvar"]
-	itagInfo, existItag := tableContent["Itag"]
+	itagInfo, existLtag := tableContent["Ltag"]
 	metaInfo, existMeta := tableContent["meta"]
 	// add test
 
@@ -106,10 +114,10 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		tables.Fvar = GetFvar(fileByte, int(fvarInfo.Offset))
 	}
 
-	if existItag {
-		itag, itagErr := GetItag(fileByte, int(itagInfo.Offset))
-		if itagErr == nil {
-			tables.Itag = itag
+	if existLtag {
+		ltag, ltagErr := GetItag(fileByte, int(itagInfo.Offset))
+		if ltagErr == nil {
+			tables.Ltag = ltag
 		}
 	}
 
@@ -121,13 +129,13 @@ func DataReader(filePath string) (directory *Directory, err error) {
 		}
 	}
 
-	directory = new(Directory)
+	fontInfo = new(FontInfo)
 
-	directory.OffsetTable = offsetTable
-	directory.TableContent = tableContent
-	directory.Tables = tables
+	fontInfo.OffsetTable = offsetTable
+	fontInfo.TableContent = tableContent
+	fontInfo.Tables = tables
 	glyfStart := tableContent["glyf"].Offset
-	directory.Glyphs = GetGlyphs(fileByte, int(glyfStart), tables.Loca, int(tables.Maxp.NumGlyphs))
+	fontInfo.Glyphs = GetGlyphs(fileByte, int(glyfStart), tables.Loca, int(tables.Maxp.NumGlyphs))
 
 	return
 }
