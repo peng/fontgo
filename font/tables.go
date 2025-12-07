@@ -15,15 +15,35 @@ type OffsetTable struct {
 }
 
 func GetScalerType(data []byte) string {
-	n := int(getUint32(data[0:4]))
-	if n == 65536 || n == 1953658213 {
-		return "TrueType"
-	} else if n == 1954115633 {
-		return "typ1"
-	} else if n == 1330926671 {
-		return "OTTO"
+	if len(data) < 4 {
+		return ""
 	}
-	return ""
+	n := getUint32(data[0:4])
+	switch n {
+	case 0x00010000, 0x74727565: // 0x00010000 or 'true'
+		return "TrueType"
+	case 0x74797031: // 'typ1'
+		return "typ1"
+	case 0x4F54544F: // 'OTTO'
+		return "OTTO"
+	default:
+		return ""
+	}
+}
+
+func WriteScalerType(t string) []byte {
+	var n uint32
+	switch t {
+	case "TrueType":
+		n = 0x00010000
+	case "typ1":
+		n = 0x74797031 // 'typ1'
+	case "OTTO":
+		n = 0x4F54544F // 'OTTO'
+	default:
+		return []byte{0, 0, 0, 0}
+	}
+	return writeUint32(n)
 }
 
 func GetOffsetTable(data []byte) *OffsetTable {
@@ -34,6 +54,16 @@ func GetOffsetTable(data []byte) *OffsetTable {
 		getUint16(data[8:10]),
 		getUint16(data[10:12]),
 	}
+}
+
+func WriteOffsetTable(offsetTable *OffsetTable) []byte {
+	data := make([]byte, 12)
+	data = append(data, WriteScalerType(offsetTable.ScalerType)...)
+	data = append(data, writeUint16(offsetTable.NumTables)...)
+	data = append(data, writeUint16(offsetTable.SearchRange)...)
+	data = append(data, writeUint16(offsetTable.EntrySelector)...)
+	data = append(data, writeUint16(offsetTable.RangeShift)...)
+	return data
 }
 
 type TableContent map[string]*TagItem
@@ -96,13 +126,17 @@ func GetHead(data []byte, pos int) *Head {
 	}
 }
 
+func WriteHead(head *Head, writeFontData []byte) {
+
+}
+
 type Flag struct {
 	OnCurve      bool `json:"onCurve"`
-	XShortVector bool `json:"xShortVector`
+	XShortVector bool `json:"xShortVector"`
 	YShortVector bool `json:"yShortVector"`
 	Repeat       bool `json:"repeat"`
 	XSame        bool `json:"xSame"`
-	YSame        bool `json:"ySave"`
+	YSame        bool `json:"ySame"`
 }
 type Point struct {
 	X    int   `json:"x"`
@@ -569,15 +603,15 @@ type CmapFormat8nGroup struct {
 }
 
 type CmapFormatDefaultUVS struct {
-	StartUnicode int    `json:"startUnicode"`
-	EndUnicode   int    `json:"endUnicode"`
-	VarSelector  uint32 `json:"varSelector"`
+	StartUnicode int `json:"startUnicode"`
+	EndUnicode   int `json:"endUnicode"`
+	VarSelector  int `json:"varSelector"`
 }
 
 type CmapFormatNonDefaultUVS struct {
 	UnicodeValue int    `json:"unicodeValue"`
 	GlyphID      uint16 `json:"glyphId"`
-	VarSelector  uint32 `json:"varSelector"`
+	VarSelector  int    `json:"varSelector"`
 }
 
 func readWindowsCode(subTables []map[string]interface{}, maxpNumGlyphs int) (code map[int]int, err error) {
@@ -1023,7 +1057,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 			n := subTable["numVarSelectorRecords"].(int)
 			var groups []interface{}
 			for i := 0; i < n; i++ {
-				var varSelector uint32
+				var varSelector int
 				varSelector, err = getUint24(data[curPos : curPos+3])
 				curPos += 3
 				if err != nil {
@@ -1038,20 +1072,19 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 					numUnicodeValueRanges := int(getUint32(data[curPos+defaultUVSOffset : curPos+defaultUVSOffset+4]))
 
 					for i := 0; i < numUnicodeValueRanges; i++ {
-						var startUnicode uint32
+						var startUnicode int
 						startUnicode, err = getUint24(data[curPos : curPos+3])
 						curPos += 3
 						if err != nil {
 							return
 						}
-						start := int(startUnicode)
 						additionalCount := int(getUint8(data[curPos : curPos+1]))
 						curPos++
-						end := start + additionalCount
+						end := startUnicode + additionalCount
 						var res []interface{}
 						res = append(res, 0)
 						res = append(res, &CmapFormatDefaultUVS{
-							start,
+							startUnicode,
 							end,
 							varSelector,
 						})
@@ -1063,7 +1096,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 					numUVSMappings := int(getUint32(data[startPos+nonDefaultUVSOffset : startPos+nonDefaultUVSOffset+4]))
 
 					for i := 0; i < numUVSMappings; i++ {
-						var v uint32
+						var v int
 						v, err = getUint24(data[curPos : curPos+3])
 						curPos += 3
 						if err != nil {
@@ -1072,7 +1105,7 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 						var res []interface{}
 						res = append(res, 1)
 						res = append(res, &CmapFormatNonDefaultUVS{
-							int(v),
+							v,
 							getUint16(data[curPos : curPos+4]),
 							varSelector,
 						})
