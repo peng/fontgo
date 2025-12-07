@@ -14,53 +14,108 @@ func getUint8(data []byte) uint8 {
 	return data[0]
 }
 
+func writeUint8(num uint8) []byte {
+	return []byte{num}
+}
+
 func getUint16(data []byte) uint16 {
 	return binary.BigEndian.Uint16(data)
 }
 
-func getUint24(data []byte) (num uint32, err error) {
+func writeUint16(num uint16) []byte {
+	data := make([]byte, 2)
+	binary.BigEndian.PutUint16(data, num)
+	return data
+}
+
+func getUint24(data []byte) (num int, err error) {
 	if len(data) < 3 {
 		err = errors.New("data to short to read uint24")
 		return
 	}
-
-	num |= uint32(data[0]) << 16
-	num |= uint32(data[1]) << 8
-	num |= uint32(data[2])
-
+	var n uint32
+	n |= uint32(data[0]) << 16
+	n |= uint32(data[1]) << 8
+	n |= uint32(data[2])
+	num = int(n)
 	return
+}
+
+func writeUint24(num int) []byte {
+	n := uint32(num)
+	return []byte{
+		byte(n >> 16),
+		byte(n >> 8),
+		byte(n),
+	}
 }
 
 func getUint32(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
+func writeUint32(num uint32) []byte {
+	data := make([]byte, 4)
+	binary.BigEndian.PutUint32(data, num)
+	return data
+}
+
 func getUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)
+}
+
+func writeUint64(num uint64) []byte {
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, num)
+	return data
 }
 
 func getInt8(data []byte) int8 {
 	return int8(data[0])
 }
 
+func writeInt8(num int8) []byte {
+	return writeUint8(uint8(num))
+}
+
 func getInt16(data []byte) int16 {
 	return int16(getUint16((data)))
+}
+
+func writeInt16(num int16) []byte {
+	return writeUint16(uint16(num))
 }
 
 func getInt32(data []byte) int32 {
 	return int32(getUint32(data))
 }
 
+func writeInt32(num int32) []byte {
+	return writeUint32(uint32(num))
+}
+
 func getInt64(data []byte) int64 {
 	return int64(getUint64(data))
+}
+
+func writeInt64(num int64) []byte {
+	return writeUint64(uint64(num))
 }
 
 func getString(data []byte) string {
 	return string(data)
 }
 
+func writeString(str string) []byte {
+	return []byte(str)
+}
+
 func getFixed(data []byte) float64 {
-	return float64(getInt32(data) / 65535)
+	return float64(getInt32(data)) / 65536.0
+}
+
+func writeFixed(num float64) []byte {
+	return writeInt32(int32(num * 65536.0))
 }
 
 func getFixed32(data []byte) uint32 {
@@ -68,16 +123,32 @@ func getFixed32(data []byte) uint32 {
 	return getUint32(data)
 }
 
+func writeFixed32(num uint32) []byte {
+	return writeUint32(num)
+}
+
 func getFWord(data []byte) int16 {
 	return getInt16(data)
+}
+
+func writeFWord(num int16) []byte {
+	return writeInt16(num)
 }
 
 func getUFWord(data []byte) uint16 {
 	return getUint16(data)
 }
 
+func writeUFWord(num uint16) []byte {
+	return writeUint16(num)
+}
+
 func get2Dot14(data []byte) float32 {
-	return float32(getInt16(data) / 16384)
+	return float32(getInt16(data)) / 16384.0
+}
+
+func write2Dot14(num float32) []byte {
+	return writeInt16(int16(num * 16384.0))
 }
 
 func getLongDateTime(data []byte) int64 {
@@ -90,11 +161,36 @@ func getLongDateTime(data []byte) int64 {
 	return unixTime
 }
 
+func writeLongDateTime(unixTime int64) []byte {
+	starTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC).Unix()
+	longDateTime := unixTime - starTime
+	return writeInt64(longDateTime)
+}
+
 func getVersion(data []byte) string {
 	// 32 bytes
 	major := strconv.Itoa(int(getUint16(data[:2])))
 	minor := strconv.Itoa(int(getUint16(data[2:4])))
 	return major + "." + minor
+}
+
+func writeVersion(version string) []byte {
+	parts := strings.SplitN(version, ".", 2)
+	var major, minor uint16
+	if len(parts) > 0 {
+		if v, err := strconv.Atoi(parts[0]); err == nil {
+			major = uint16(v)
+		}
+	}
+	if len(parts) == 2 {
+		if v, err := strconv.Atoi(parts[1]); err == nil {
+			minor = uint16(v)
+		}
+	}
+	data := make([]byte, 4)
+	binary.BigEndian.PutUint16(data[:2], major)
+	binary.BigEndian.PutUint16(data[2:], minor)
+	return data
 }
 
 func DecodeUTF8(data []byte, offset int, numBytes int) string {
