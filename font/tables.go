@@ -84,6 +84,18 @@ func GetTableContent(numTables int, date []byte) TableContent {
 	return tableContent
 }
 
+func WriteTableContent(tableContent TableContent) []byte {
+	data := []byte{}
+	for tagName, tagItem := range tableContent {
+		data = append(data, writeString(tagName)...)
+
+		data = append(data, writeUint32(tagItem.CheckSum)...)
+		data = append(data, writeUint32(tagItem.Offset)...)
+		data = append(data, writeUint32(tagItem.Length)...)
+	}
+	return data
+}
+
 type Head struct {
 	Version            float64 `json:"version"`
 	FontRevision       float64 `json:"fontRevision"`
@@ -126,8 +138,26 @@ func GetHead(data []byte, pos int) *Head {
 	}
 }
 
-func WriteHead(head *Head, writeFontData []byte) {
-
+func WriteHead(head *Head) []byte {
+	data := make([]byte, 54)
+	data = append(data, writeFixed(head.Version)...)
+	data = append(data, writeFixed(head.FontRevision)...)
+	data = append(data, writeUint32(head.CheckSumAdjustment)...)
+	data = append(data, writeUint32(head.MagicNumber)...)
+	data = append(data, writeUint16(head.Flags)...)
+	data = append(data, writeUint16(head.UnitsPerEm)...)
+	data = append(data, writeInt64(head.Created)...)
+	data = append(data, writeInt64(head.Modified)...)
+	data = append(data, writeInt16(head.XMin)...)
+	data = append(data, writeInt16(head.YMin)...)
+	data = append(data, writeInt16(head.XMax)...)
+	data = append(data, writeInt16(head.YMax)...)
+	data = append(data, writeUint16(head.MacStyle)...)
+	data = append(data, writeUint16(head.LowestRecPPEM)...)
+	data = append(data, writeInt16(head.FontDirectionHint)...)
+	data = append(data, writeInt16(head.IndexToLocFormat)...)
+	data = append(data, writeInt16(head.GlyphDataFormat)...)
+	return data
 }
 
 type Flag struct {
@@ -299,6 +329,49 @@ func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
 	}
 
 	return
+}
+
+func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
+	data := []byte{}
+	// write glyph commom
+	data = append(data, writeInt16(glyphSimple.GlyphCommon.NumberOfContours)...)
+	data = append(data, writeFWord(glyphSimple.GlyphCommon.XMin)...)
+	data = append(data, writeFWord(glyphSimple.GlyphCommon.YMin)...)
+	data = append(data, writeFWord(glyphSimple.GlyphCommon.XMax)...)
+	data = append(data, writeFWord(glyphSimple.GlyphCommon.YMax)...)
+
+	// write endPtsOfContours
+	for _, epc := range glyphSimple.EndPtsOfContours {
+		data = append(data, writeUint16(epc)...)
+	}
+
+	// write Instructions
+	for _, ins := range glyphSimple.Instructions {
+		data = append(data, writeUint8(ins)...)
+	}
+
+	for i, nextRepeat := 1, false; i < len(glyphSimple.Points); {
+		flag := glyphSimple.Points[i].Flag
+		var flagNum uint8
+		if flag.OnCurve {
+			flagNum += 0x01
+		}
+		if flag.XShortVector {
+			flagNum += 0x02
+		}
+		if flag.YShortVector {
+			flagNum += 0x04
+		}
+		if flag.Repeat {
+			flagNum += 0x08
+		}
+		if flag.XSame {
+			flagNum += 0x10
+		}
+		if flag.YSame {
+			flagNum += 0x20
+		}
+	}
 }
 
 func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
