@@ -349,9 +349,16 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	for _, ins := range glyphSimple.Instructions {
 		data = append(data, writeUint8(ins)...)
 	}
+	flagsData, xData, yData := []byte{},[]byte{},[]byte{}
+	var (
+		repeatFlagNum uint8
+		repeatNum uint8
+	)
+	for i := 0; i < len(glyphSimple.Points); {
+		point := glyphSimple.Points[i]
 
-	for i, nextRepeat := 1, false; i < len(glyphSimple.Points); {
-		flag := glyphSimple.Points[i].Flag
+		// write flags
+		flag := point.Flag
 		var flagNum uint8
 		if flag.OnCurve {
 			flagNum += 0x01
@@ -370,6 +377,27 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 		}
 		if flag.YSame {
 			flagNum += 0x20
+		}
+
+		if repeatFlagNum != 0 {
+			// has repeat
+			if repeatFlagNum == flagNum {
+				repeatNum++
+			} else {
+				flagsData = append(flagsData, writeUint8(repeatNum)...)
+				flagsData = append(flagsData, writeUint8(flagNum)...)
+				if flag.Repeat {
+					repeatFlagNum = flagNum
+				} else {
+					repeatFlagNum = 0
+				}
+				repeatNum = 0
+			}
+		} else {
+			if flag.Repeat {
+				repeatFlagNum = flagNum
+			}
+			flagsData = append(flagsData, writeUint8(flagNum)...)
 		}
 	}
 }
