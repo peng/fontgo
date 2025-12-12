@@ -57,7 +57,7 @@ func GetOffsetTable(data []byte) *OffsetTable {
 }
 
 func WriteOffsetTable(offsetTable *OffsetTable) []byte {
-	data := make([]byte, 12)
+	data := []byte{}
 	data = append(data, WriteScalerType(offsetTable.ScalerType)...)
 	data = append(data, writeUint16(offsetTable.NumTables)...)
 	data = append(data, writeUint16(offsetTable.SearchRange)...)
@@ -139,7 +139,7 @@ func GetHead(data []byte, pos int) *Head {
 }
 
 func WriteHead(head *Head) []byte {
-	data := make([]byte, 54)
+	data := []byte{}
 	data = append(data, writeFixed(head.Version)...)
 	data = append(data, writeFixed(head.FontRevision)...)
 	data = append(data, writeUint32(head.CheckSumAdjustment)...)
@@ -346,15 +346,16 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	}
 
 	// write Instructions
+	data = append(data, writeUint16(uint16(len(glyphSimple.Instructions)))...)
 	for _, ins := range glyphSimple.Instructions {
 		data = append(data, writeUint8(ins)...)
 	}
-	flagsData, xData, yData := []byte{},[]byte{},[]byte{}
+	flagsData, xData, yData := []byte{}, []byte{}, []byte{}
 	var (
 		repeatFlagNum uint8
 		repeatNum uint8
 	)
-	for i := 0; i < len(glyphSimple.Points); {
+	for i := 0; i < len(glyphSimple.Points); i++ {
 		point := glyphSimple.Points[i]
 
 		// write flags
@@ -399,7 +400,34 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 			}
 			flagsData = append(flagsData, writeUint8(flagNum)...)
 		}
+
+		// write x
+		x := point.X
+		if flag.XShortVector {
+			if !flag.XSame {
+				x *= -1
+			}
+			xData = append(xData, writeUint8(uint8(x))...)
+		} else if !flag.XSame {
+			xData = append(xData, writeUint16(uint16(x))...)
+		}
+
+		// write y
+		y := point.Y
+		if flag.YShortVector {
+			if !flag.YSame {
+				y *= -1
+			}
+			yData = append(yData, writeUint8(uint8(y))...)
+		} else if !flag.YSame {
+			yData = append(yData, writeUint16(uint16(y))...)
+		}
 	}
+
+	data = append(data, flagsData...)
+	data = append(data, xData...)
+	data = append(data, yData...)
+	return  data
 }
 
 func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
