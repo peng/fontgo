@@ -192,9 +192,10 @@ type GlyphSimple struct {
 }
 
 type Component struct {
-	Flags     uint16 `json:"flags"`
-	Argument1 int    `json:"argument1"`
-	Argument2 int    `json:"argument2"`
+	Flags      uint16 `json:"flags"`
+	GlyphIndex uint16 `json:"glyphIndex"`
+	Argument1  int    `json:"argument1"`
+	Argument2  int    `json:"argument2"`
 	// Unsign     bool    `json:"unsign"`
 	// Scale   float32 `json:"scale"`
 	Xscale  float32 `json:"xscale"`
@@ -353,7 +354,7 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	flagsData, xData, yData := []byte{}, []byte{}, []byte{}
 	var (
 		repeatFlagNum uint8
-		repeatNum uint8
+		repeatNum     uint8
 	)
 	for i := 0; i < len(glyphSimple.Points); i++ {
 		point := glyphSimple.Points[i]
@@ -427,23 +428,24 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	data = append(data, flagsData...)
 	data = append(data, xData...)
 	data = append(data, yData...)
-	return  data
+	return data
 }
+
+const (
+	ARG_1_AND_2_ARE_WORDS    uint16 = 0x0001
+	ARGS_ARE_XY_VALUES       uint16 = 0x0002
+	ROUND_XY_TO_GRID         uint16 = 0x0004
+	WE_HAVE_A_SCALE          uint16 = 0x0008
+	MORE_COMPONENTS          uint16 = 0x0020
+	WE_HAVE_AN_X_AND_Y_SCALE uint16 = 0x0040
+	WE_HAVE_A_TWO_BY_TWO     uint16 = 0x0080
+	WE_HAVE_INSTRUCTIONS     uint16 = 0x0100
+	USE_MY_METRICS           uint16 = 0x0200
+	OVERLAP_COMPOUND         uint16 = 0x0400
+)
 
 func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 	compound = new(GlyphCompound)
-	const (
-		ARG_1_AND_2_ARE_WORDS    uint16 = 0x0001
-		ARGS_ARE_XY_VALUES       uint16 = 0x0002
-		ROUND_XY_TO_GRID         uint16 = 0x0004
-		WE_HAVE_A_SCALE          uint16 = 0x0008
-		MORE_COMPONENTS          uint16 = 0x0020
-		WE_HAVE_AN_X_AND_Y_SCALE uint16 = 0x0040
-		WE_HAVE_A_TWO_BY_TWO     uint16 = 0x0080
-		WE_HAVE_INSTRUCTIONS     uint16 = 0x0100
-		USE_MY_METRICS           uint16 = 0x0200
-		OVERLAP_COMPOUND         uint16 = 0x0400
-	)
 
 	compound.Type = GLYPH_TYPE_COMPOUND
 	compound.NumberOfContours = getInt16(data[pos : pos+2])
@@ -461,6 +463,9 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 
 		flags = getUint16(data[pos : pos+2])
 		component.Flags = flags
+		pos += 2
+
+		component.GlyphIndex = getUint16(data[pos : pos+2])
 		pos += 2
 
 		if (flags & ARG_1_AND_2_ARE_WORDS) == ARG_1_AND_2_ARE_WORDS {
@@ -490,23 +495,27 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 		}
 
 		if flags&WE_HAVE_A_SCALE == WE_HAVE_A_SCALE {
-			// component.Scale = get2Dot14(data[pos : pos+2])
+			// 单一缩放值，X/Y 共用
 			component.Xscale = get2Dot14(data[pos : pos+2])
 			component.Yscale = component.Xscale
+			pos += 2
 		} else if flags&WE_HAVE_AN_X_AND_Y_SCALE == WE_HAVE_AN_X_AND_Y_SCALE {
-			component.Xscale = get2Dot14((data[pos : pos+2]))
+			// X/Y 各一个缩放值
+			component.Xscale = get2Dot14(data[pos : pos+2])
 			pos += 2
 			component.Yscale = get2Dot14(data[pos : pos+2])
+			pos += 2
 		} else if flags&WE_HAVE_A_TWO_BY_TWO == WE_HAVE_A_TWO_BY_TWO {
+			// 2x2 变换矩阵
 			component.Xscale = get2Dot14(data[pos : pos+2])
 			pos += 2
 			component.Scale01 = get2Dot14(data[pos : pos+2])
 			pos += 2
 			component.Scale10 = get2Dot14(data[pos : pos+2])
 			pos += 2
-			component.Xscale = get2Dot14(data[pos : pos+2])
+			component.Yscale = get2Dot14(data[pos : pos+2])
+			pos += 2
 		}
-		pos += 2
 
 		compound.Component = append(compound.Component, *component)
 
@@ -525,6 +534,52 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 	}
 
 	return
+}
+
+func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
+	data := []byte{}
+	data = append(data, writeInt16(glyphCompound.NumberOfContours)...)
+	data = append(data, writeFWord(glyphCompound.XMin)...)
+	data = append(data, writeFWord(glyphCompound.YMin)...)
+	data = append(data, writeFWord(glyphCompound.XMax)...)
+	data = append(data, writeFWord(glyphCompound.YMax)...)
+
+	for _, component := range glyphCompound.Component {
+		flags := component.Flags
+		data = append(data, writeUint16(flags)...)
+		data = append(data, writeUint16(component.GlyphIndex)...)
+
+		// write argument1 2
+		if (flags & ARG_1_AND_2_ARE_WORDS) == ARG_1_AND_2_ARE_WORDS {
+			if (flags & ARGS_ARE_XY_VALUES) == ARGS_ARE_XY_VALUES {
+				data = append(data, writeInt16(int16(component.Argument1))...)
+				data = append(data, writeInt16(int16(component.Argument2))...)
+			} else {
+				data = append(data, writeUint16(uint16(component.Argument1))...)
+				data = append(data, writeUint16(uint16(component.Argument2))...)
+			}
+		} else {
+			if flags&ARGS_ARE_XY_VALUES == ARGS_ARE_XY_VALUES {
+				data = append(data, writeInt8(int8(component.Argument1))...)
+				data = append(data, writeInt8(int8(component.Argument2))...)
+			} else {
+				data = append(data, writeUint8(uint8(component.Argument1))...)
+				data = append(data, writeUint8(uint8(component.Argument2))...)
+			}
+		}
+
+		if flags&WE_HAVE_A_SCALE == WE_HAVE_A_SCALE {
+			data = append(data, write2Dot14(component.Xscale)...)
+		} else if flags&WE_HAVE_AN_X_AND_Y_SCALE == WE_HAVE_AN_X_AND_Y_SCALE {
+			data = append(data, write2Dot14(component.Xscale)...)
+			data = append(data, write2Dot14(component.Yscale)...)
+		} else if flags&WE_HAVE_A_TWO_BY_TWO == WE_HAVE_A_TWO_BY_TWO {
+			data = append(data, write2Dot14(component.Xscale)...)
+			data = append(data, write2Dot14(component.Scale01)...)
+			data = append(data, write2Dot14(component.Scale10)...)
+			data = append(data, write2Dot14(component.Yscale)...)
+		}
+	}
 }
 
 func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs) {
