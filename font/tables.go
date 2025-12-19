@@ -522,7 +522,7 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 		moreComponent = flags&MORE_COMPONENTS == MORE_COMPONENTS
 	}
 
-	// can't understand
+	// opentype has demo
 	if flags&WE_HAVE_INSTRUCTIONS == WE_HAVE_INSTRUCTIONS {
 		compound.InstructionLength = int(getUint16(data[pos : pos+2]))
 		pos += 2
@@ -535,7 +535,7 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 
 	return
 }
-
+var flags uint16
 func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
 	data := []byte{}
 	data = append(data, writeInt16(glyphCompound.NumberOfContours)...)
@@ -545,7 +545,7 @@ func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
 	data = append(data, writeFWord(glyphCompound.YMax)...)
 
 	for _, component := range glyphCompound.Component {
-		flags := component.Flags
+		flags = component.Flags
 		data = append(data, writeUint16(flags)...)
 		data = append(data, writeUint16(component.GlyphIndex)...)
 
@@ -580,6 +580,14 @@ func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
 			data = append(data, write2Dot14(component.Yscale)...)
 		}
 	}
+
+	if flags&WE_HAVE_INSTRUCTIONS == WE_HAVE_INSTRUCTIONS {
+		data = append(data, writeUint16(uint16(glyphCompound.InstructionLength))...)
+		for _, ins := range glyphCompound.Instructions {
+			data = append(data, writeUint8(ins)...)
+		}
+	}
+	return  data
 }
 
 func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs) {
