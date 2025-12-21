@@ -693,7 +693,7 @@ func GetMaxp(data []byte, pos int) *Maxp {
 	}
 	
 	// Version 1.0: TrueType with glyph outlines
-	// t
+	// 
 	if maxp.Version == "1.0" {
 		maxp.MaxPoints = getUint16(data[pos+6 : pos+8])
 		maxp.MaxContours = getUint16(data[pos+8 : pos+10])
