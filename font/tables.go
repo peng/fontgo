@@ -175,6 +175,7 @@ type Point struct {
 }
 
 type GlyphCommon struct {
+	Index            int    `json:"index"`
 	NumberOfContours int16  `json:"numberOfContours"`
 	XMin             int16  `json:"xMin"`
 	YMin             int16  `json:"yMin"`
@@ -218,8 +219,9 @@ type Glyphs struct {
 
 const GLYPH_TYPE_SIMPLE, GLYPH_TYPE_COMPOUND = "simple", "compound"
 
-func GetGlyphSimple(data []byte, pos int) (simple *GlyphSimple) {
+func GetGlyphSimple(data []byte, pos int, index int) (simple *GlyphSimple) {
 	simple = new(GlyphSimple)
+	simple.GlyphCommon.Index = index
 	simple.GlyphCommon.Type = GLYPH_TYPE_SIMPLE
 	simple.GlyphCommon.NumberOfContours = getInt16(data[pos : pos+2])
 	simple.GlyphCommon.XMin = getFWord(data[pos+2 : pos+4])
@@ -444,9 +446,9 @@ const (
 	OVERLAP_COMPOUND         uint16 = 0x0400
 )
 
-func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
+func GetGlyphCompound(data []byte, pos int, index int) (compound *GlyphCompound) {
 	compound = new(GlyphCompound)
-
+	compound.GlyphCommon.Index = index
 	compound.Type = GLYPH_TYPE_COMPOUND
 	compound.NumberOfContours = getInt16(data[pos : pos+2])
 	compound.XMin = getFWord(data[pos+2 : pos+4])
@@ -535,7 +537,9 @@ func GetGlyphCompound(data []byte, pos int) (compound *GlyphCompound) {
 
 	return
 }
+
 var flags uint16
+
 func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
 	data := []byte{}
 	data = append(data, writeInt16(glyphCompound.NumberOfContours)...)
@@ -587,7 +591,7 @@ func WriteGlyphCompound(glyphCompound *GlyphCompound) []byte {
 			data = append(data, writeUint8(ins)...)
 		}
 	}
-	return  data
+	return data
 }
 
 func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs) {
@@ -604,15 +608,59 @@ func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs)
 		if numberOfContours >= 0 {
 			// fmt.Println("numberOfContours", numberOfContours)
 			// simple
-			simp := GetGlyphSimple(data, inPos)
+			simp := GetGlyphSimple(data, inPos, i)
 			glyphs.Simples = append(glyphs.Simples, *simp)
 		} else {
 			// compound
-			compound := GetGlyphCompound(data, inPos)
+			compound := GetGlyphCompound(data, inPos, i)
 			glyphs.Compounds = append(glyphs.Compounds, *compound)
 		}
 	}
 	return
+}
+
+func WriteGlyphs(glyphs *Glyphs) ([]byte, error) {
+	var (
+		data []byte
+	)
+	for i, simpPos, compPos := 0, 0, 0; i < (len(glyphs.Simples) + len(glyphs.Compounds)); i++ {
+		find := false
+		for simpPos < len(glyphs.Simples) {
+			simple := glyphs.Simples[simpPos]
+			if simple.GlyphCommon.Index > i {
+				break
+			}
+			if simple.GlyphCommon.Index == i {
+				data = append(data, WriteGlyphSimple(&simple)...)
+				find = true
+				simpPos++
+				break
+			}
+			simpPos++
+		}
+		if find {
+			continue
+		}
+
+		for compPos < len(glyphs.Compounds) {
+			compound := glyphs.Compounds[compPos]
+			if compound.GlyphCommon.Index > i {
+				break
+			}
+			if compound.GlyphCommon.Index == i {
+				data = append(data, WriteGlyphCompound(&compound)...)
+				find = true
+				compPos++
+				break
+			}
+			compPos++
+		}
+		if !find {
+			return data, errors.New("Match index error!")
+		}
+	}
+
+	return data, nil
 }
 
 type Maxp struct {
@@ -637,6 +685,14 @@ func GetMaxp(data []byte, pos int) *Maxp {
 	maxp := new(Maxp)
 	maxp.Version = getVersion(data[pos : pos+4])
 	maxp.NumGlyphs = getUint16(data[pos+4 : pos+6])
+	
+	// Version 0.5: TrueType without glyph outlines (CFF)
+	// Only Version and NumGlyphs; other fields remain 0
+	if maxp.Version == "0.5" {
+		return maxp
+	}
+	
+	// Version 1.0: TrueType with glyph outlines
 	if maxp.Version == "1.0" {
 		maxp.MaxPoints = getUint16(data[pos+6 : pos+8])
 		maxp.MaxContours = getUint16(data[pos+8 : pos+10])
