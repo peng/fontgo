@@ -712,6 +712,33 @@ func GetMaxp(data []byte, pos int) *Maxp {
 	return maxp
 }
 
+func WriteMaxp(maxp *Maxp) []byte {
+	data := []byte{}
+	data = append(data, writeVersion(maxp.Version)...)
+	data = append(data, writeUint16(maxp.NumGlyphs)...)
+	if maxp.Version == "0.5" {
+		return data
+	}
+
+	if maxp.Version == "1.0" {
+		data = append(data, writeUint16(maxp.MaxPoints)...)
+		data = append(data, writeUint16(maxp.MaxContours)...)
+		data = append(data, writeUint16(maxp.MaxComponentPoints)...)
+		data = append(data, writeUint16(maxp.MaxComponentContours)...)
+		data = append(data, writeUint16(maxp.MaxZones)...)
+		data = append(data, writeUint16(maxp.MaxTwilightPoints)...)
+		data = append(data, writeUint16(maxp.MaxStorage)...)
+		data = append(data, writeUint16(maxp.MaxFunctionDefs)...)
+		data = append(data, writeUint16(maxp.MaxInstructionDefs)...)
+		data = append(data, writeUint16(maxp.MaxStackElements)...)
+		data = append(data, writeUint16(maxp.MaxSizeOfInstructions)...)
+		data = append(data, writeUint16(maxp.MaxComponentElements)...)
+		data = append(data, writeUint16(maxp.MaxComponentDepth)...)
+		return data
+	}
+	return data
+}
+
 func GetLoca(data []byte, pos int, numGlyphs uint16, indexToLocFormat int16) (locations []int) {
 	// long version:  otf, ttf is different
 	offsetFn := func(data []byte, pos int) (offset int, nextPos int) {
