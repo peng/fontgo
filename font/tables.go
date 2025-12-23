@@ -766,6 +766,39 @@ func GetLoca(data []byte, pos int, numGlyphs uint16, indexToLocFormat int16) (lo
 	return locations
 }
 
+func WriteLoca(locations []int, indexToLocFormat int16) []byte {
+	// Validate indexToLocFormat is 0 or 1; otherwise return an error.
+	if indexToLocFormat != 0 && indexToLocFormat != 1 {
+		panic("indexToLocFormat must be 0 or 1")
+	}
+
+	// For short format, ensure location%2==0 and location/2 <= 0xFFFF, otherwise fall back to long format.
+	useShort := indexToLocFormat == 0
+	if useShort {
+		for _, loc := range locations {
+			if loc%2 != 0 || loc/2 > 0xFFFF {
+				useShort = false
+				break
+			}
+		}
+	}
+
+	ratio := 1
+	if useShort {
+		ratio = 2
+	}
+
+	data := make([]byte, 0, len(locations)*4)
+	for _, location := range locations {
+		if useShort {
+			data = append(data, writeUint16(uint16(location/ratio))...)
+			continue
+		}
+		data = append(data, writeUint32(uint32(location/ratio))...)
+	}
+	return data
+}
+
 type Cmap struct {
 	Version         uint16                   `json:"version"`
 	NumberSubtables uint16                   `json:"numberSubtables"`
