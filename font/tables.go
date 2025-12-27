@@ -1444,6 +1444,131 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 	return
 }
 
+func WriteCmap(cmap *Cmap) (data []byte, err error) {
+	data = append(data, writeUint16(cmap.Version)...)
+	data = append(data, writeUint16(cmap.NumberSubtables)...)
+
+	for _, subTable := range cmap.SubTables {
+		data = append(data, writeUint16(subTable["platformID"].(uint16))...)
+		data = append(data, writeUint16(subTable["platformSpecificID"].(uint16))...)
+		data = append(data, writeUint32(subTable["offset"].(uint32))...)
+		format, ok := subTable["format"].(uint16)
+		if !ok {
+			err = errors.New("cmap format int error")
+			return
+		}
+		data = append(data, writeUint16(format)...)
+		if format == 0 {
+			data = append(data, writeUint16(subTable["length"].(uint16))...)
+			data = append(data, writeUint16(subTable["language"].(uint16))...)
+			glyphIndexArray := subTable["glyphIndexArray"].([]uint8)
+
+			for _, item := range glyphIndexArray {
+				data = append(data, writeUint8(item)...)
+			}
+		} else if format == 2 {
+			data = append(data, writeUint16(subTable["length"].(uint16))...)
+			data = append(data, writeUint16(subTable["language"].(uint16))...)
+
+			for _, item := range subTable["subHeaderKeys"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+			for _, item := range subTable["subHeaders"].([]*CmapFormat2SubHeader) {
+				data = append(data, writeUint16(item.FirstCode)...)
+				data = append(data, writeUint16(item.EntryCount)...)
+				data = append(data, writeInt16(item.IdDelta)...)
+				data = append(data, writeUint16(item.IdRangeOffset)...)
+			}
+
+			for _, item := range subTable["glyphIndexArray"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+		} else if format == 4 {
+			data = append(data, writeUint16(subTable["length"].(uint16))...)
+			data = append(data, writeUint16(subTable["language"].(uint16))...)
+			data = append(data, writeUint16(subTable["segCountX2"].(uint16))...)
+			data = append(data, writeUint16(subTable["searchRange"].(uint16))...)
+			data = append(data, writeUint16(subTable["entrySelector"].(uint16))...)
+			data = append(data, writeUint16(subTable["rangeShift"].(uint16))...)
+
+			for _, item := range subTable["endCode"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+			data = append(data, writeUint16(subTable["reservedPad"].(uint16))...)
+
+			for _, item := range subTable["startCode"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+			for _, item := range subTable["idDelta"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+			for _, item := range subTable["idRangeOffset"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+			for _, item := range subTable["glyphIndexArray"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+		} else if format == 6 {
+			data = append(data, writeUint16(subTable["length"].(uint16))...)
+			data = append(data, writeUint16(subTable["language"].(uint16))...)
+			data = append(data, writeUint16(subTable["firstCode"].(uint16))...)
+			data = append(data, writeUint16(subTable["entryCount"].(uint16))...)
+
+			for _, item := range subTable["glyphIndexArray"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+		} else if format == 8 {
+			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
+			data = append(data, writeUint32(subTable["length"].(uint32))...)
+			data = append(data, writeUint32(subTable["language"].(uint32))...)
+
+			for _, item := range subTable["is32"].([]uint8) {
+				data = append(data, writeUint8(item)...)
+			}
+
+			data = append(data, writeUint32(subTable["nGroups"].(uint32))...)
+
+			for _, item := range subTable["groups"].([]*CmapFormat8nGroup) {
+				data = append(data, writeUint32(item.StartCharCode)...)
+				data = append(data, writeUint32(item.EndCharCode)...)
+				data = append(data, writeUint32(item.StartGlyphCode)...)
+			}
+		} else if format == 10 {
+
+			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
+			data = append(data, writeUint32(subTable["length"].(uint32))...)
+			data = append(data, writeUint32(subTable["language"].(uint32))...)
+			data = append(data, writeUint32(subTable["startCharCode"].(uint32))...)
+			data = append(data, writeUint32(subTable["numChars"].(uint32))...)
+
+			for _, item := range subTable["glyphs"].([]uint16) {
+				data = append(data, writeUint16(item)...)
+			}
+
+		} else if format == 12 || format == 13 {
+			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
+			data = append(data, writeUint32(subTable["length"].(uint32))...)
+			data = append(data, writeUint32(subTable["language"].(uint32))...)
+			data = append(data, writeUint32(subTable["nGroups"].(uint32))...)
+
+			for _, item := range subTable["groups"].([]*CmapFormat8nGroup) {
+				data = append(data, writeUint32(item.StartCharCode)...)
+				data = append(data, writeUint32(item.EndCharCode)...)
+				data = append(data, writeUint32(item.StartGlyphCode)...)
+			}
+
+		} else if format == 14 {
+			
+		}
+	}
+	return
+}
+
 type NameRecord struct {
 	PlatformID         uint16 `json:"platformId"`
 	PlatformSpecificID uint16 `json:"platformSpecificId"`
