@@ -3,7 +3,9 @@ package font
 import (
 	"errors"
 	"log"
+	"sort"
 	"strconv"
+	"unicode/utf16"
 )
 
 type OffsetTable struct {
@@ -1563,7 +1565,96 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 			}
 
 		} else if format == 14 {
+			data = append(data, writeUint32(subTable["length"].(uint32))...)
+			data = append(data, writeUint32(subTable["numVarSelectorRecords"].(uint32))...)
+
+			groups := subTable["groups"].([]interface{})
 			
+			// Group by varSelector to reconstruct the variation selector records
+			varSelectors := make(map[int]struct {
+				defaultUVS    []*CmapFormatDefaultUVS
+				nonDefaultUVS []*CmapFormatNonDefaultUVS
+			})
+			
+			for _, g := range groups {
+				groupItem := g.([]interface{})
+				typeVal := groupItem[0].(int)
+				
+				if typeVal == 0 {
+					// Default UVS
+					defaultUVS := groupItem[1].(*CmapFormatDefaultUVS)
+					varSel := defaultUVS.VarSelector
+					rec := varSelectors[varSel]
+					rec.defaultUVS = append(rec.defaultUVS, defaultUVS)
+					varSelectors[varSel] = rec
+				} else if typeVal == 1 {
+					// Non-default UVS
+					nonDefaultUVS := groupItem[1].(*CmapFormatNonDefaultUVS)
+					varSel := nonDefaultUVS.VarSelector
+					rec := varSelectors[varSel]
+					rec.nonDefaultUVS = append(rec.nonDefaultUVS, nonDefaultUVS)
+					varSelectors[varSel] = rec
+				}
+			}
+			
+			// Sort varSelectors by key for consistent output
+			var varSelectorKeys []int
+			for k := range varSelectors {
+				varSelectorKeys = append(varSelectorKeys, k)
+			}
+			sort.Ints(varSelectorKeys)
+			
+			// Calculate offsets for variation selector records
+			// First, write variation selector records (header part)
+			headerSize := 4 + 4 + len(varSelectorKeys)*11 // length + numVarSelectorRecords + records
+			currentOffset := headerSize
+			
+			var varSelectorData []byte
+			var uvsTableData []byte
+			
+			for _, varSel := range varSelectorKeys {
+				rec := varSelectors[varSel]
+				
+				// Write variation selector (24-bit)
+				varSelectorData = append(varSelectorData, writeUint24(varSel)...)
+				
+				defaultUVSOffset := uint32(0)
+				nonDefaultUVSOffset := uint32(0)
+				
+				// Calculate and write default UVS table if present
+				var defaultUVSData []byte
+				if len(rec.defaultUVS) > 0 {
+					defaultUVSOffset = uint32(currentOffset)
+					defaultUVSData = append(defaultUVSData, writeUint32(uint32(len(rec.defaultUVS)))...)
+					for _, uvs := range rec.defaultUVS {
+						defaultUVSData = append(defaultUVSData, writeUint24(uvs.StartUnicode)...)
+						additionalCount := uint8(uvs.EndUnicode - uvs.StartUnicode)
+						defaultUVSData = append(defaultUVSData, writeUint8(additionalCount)...)
+					}
+					currentOffset += len(defaultUVSData)
+				}
+				
+				// Calculate and write non-default UVS table if present
+				var nonDefaultUVSData []byte
+				if len(rec.nonDefaultUVS) > 0 {
+					nonDefaultUVSOffset = uint32(currentOffset)
+					nonDefaultUVSData = append(nonDefaultUVSData, writeUint32(uint32(len(rec.nonDefaultUVS)))...)
+					for _, uvs := range rec.nonDefaultUVS {
+						nonDefaultUVSData = append(nonDefaultUVSData, writeUint24(uvs.UnicodeValue)...)
+						nonDefaultUVSData = append(nonDefaultUVSData, writeUint16(uvs.GlyphID)...)
+					}
+					currentOffset += len(nonDefaultUVSData)
+				}
+				
+				varSelectorData = append(varSelectorData, writeUint32(defaultUVSOffset)...)
+				varSelectorData = append(varSelectorData, writeUint32(nonDefaultUVSOffset)...)
+				
+				uvsTableData = append(uvsTableData, defaultUVSData...)
+				uvsTableData = append(uvsTableData, nonDefaultUVSData...)
+			}
+			
+			data = append(data, varSelectorData...)
+			data = append(data, uvsTableData...)
 		}
 	}
 	return
@@ -2334,6 +2425,118 @@ func GetName(data []byte, pos int) (nameTable *NameTable) {
 		}
 	}
 	return
+}
+
+func WriteName(nameTable *NameTable) []byte {
+	// Rebuild name records and string storage from Info, respecting encodings
+	// implied by platformID/platformSpecificID.
+	var stringData []byte
+	count := len(nameTable.NameRecord)
+	nameTable.Count = uint16(count)
+
+	// Compute stringOffset: header (6 bytes) + name records (12*count).
+	stringOffset := 6 + 12*count
+	if nameTable.Format == 1 {
+		// Add langTagCount field (2 bytes); here we do not emit langTag strings,
+		// so we only reserve the count field.
+		stringOffset += 2
+		nameTable.LangTagCount = 0
+		nameTable.LangTagRecord = nil
+	}
+
+	// Prepare name records with updated Length/Offset based on encoded strings.
+	var recordsBuf []byte
+	for _, nr := range nameTable.NameRecord {
+		property := ""
+		if int(nr.NameID) < len(nameTableNames) {
+			property = nameTableNames[int(nr.NameID)]
+		}
+		lang := getLangCode(int(nr.PlatformID), int(nr.LanguageID))
+		platformSpec := getPlatformSpecific(int(nr.PlatformID), int(nr.PlatformSpecificID), int(nr.LanguageID))
+
+		text := ""
+		if property != "" {
+			if langMap, ok := nameTable.Info[property]; ok {
+				if t, ok2 := langMap[lang]; ok2 {
+					text = t
+				}
+			}
+		}
+
+		encoded := encodeNameString(text, platformSpec)
+		nr.Length = uint16(len(encoded))
+		nr.Offset = uint16(len(stringData))
+		stringData = append(stringData, encoded...)
+
+		recordsBuf = append(recordsBuf, writeUint16(nr.PlatformID)...)
+		recordsBuf = append(recordsBuf, writeUint16(nr.PlatformSpecificID)...)
+		recordsBuf = append(recordsBuf, writeUint16(nr.LanguageID)...)
+		recordsBuf = append(recordsBuf, writeUint16(nr.NameID)...)
+		recordsBuf = append(recordsBuf, writeUint16(nr.Length)...)
+		recordsBuf = append(recordsBuf, writeUint16(nr.Offset)...)
+	}
+
+	// Write header
+	data := []byte{}
+	data = append(data, writeUint16(nameTable.Format)...)
+	data = append(data, writeUint16(nameTable.Count)...)
+	data = append(data, writeUint16(uint16(stringOffset))...)
+
+	// Records
+	data = append(data, recordsBuf...)
+
+	// Format 1: lang tag count (no tags emitted here)
+	if nameTable.Format == 1 {
+		data = append(data, writeUint16(nameTable.LangTagCount)...)
+	}
+
+	// String storage
+	data = append(data, stringData...)
+	return data
+}
+
+// encodeNameString encodes text according to platform-specific encoding.
+// If encoding is utf-16, we emit big-endian UTF-16 without BOM.
+// If encoding is a Mac 8-bit codepage, we try to map each rune back to the
+// codepage; unmapped runes fall back to '?'.
+func encodeNameString(text string, platformSpec string) []byte {
+	if platformSpec == eumnUtf16 || platformSpec == "" {
+		// Default to UTF-16BE
+		runes := []rune(text)
+		utf16Data := utf16.Encode(runes)
+		buf := make([]byte, 0, len(utf16Data)*2)
+		for _, v := range utf16Data {
+			buf = append(buf, byte(v>>8), byte(v))
+		}
+		return buf
+	}
+
+	// Mac 8-bit
+	table, ok := eightBitMacEncodings[platformSpec]
+	if !ok {
+		// Unknown encoding, fall back to UTF-16BE
+		return encodeNameString(text, eumnUtf16)
+	}
+
+	// Build reverse map once per call (small tables)
+	rev := make(map[rune]byte, len(table))
+	for i, r := range table {
+		rev[r] = byte(0x80 + i)
+	}
+
+	var out []byte
+	for _, r := range text {
+		if r <= 0x7F {
+			out = append(out, byte(r))
+			continue
+		}
+		if b, ok := rev[r]; ok {
+			out = append(out, b)
+		} else {
+			out = append(out, byte('?'))
+		}
+	}
+	return out
 }
 
 type Hhea struct {
