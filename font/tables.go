@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"unicode/utf16"
-
-	"golang.org/x/text/date"
 )
 
 type OffsetTable struct {
@@ -3347,22 +3345,34 @@ func GetPost(data []byte, pos int) (post *Post) {
 			pos += 2
 		}
 
-		// Read custom glyph names
-		for i := 0; i < numberOfGlyphs; i++ {
-			if int(post.GlyphNameIndex[i]) >= len(standardNames) {
-				if pos+1 > len(data) {
-					log.Printf("[WARNING] GetPost: format 2 custom name length truncated at pos %d for glyph %d", pos, i)
-					break
-				}
-				nameLen := int(getInt8(data[pos : pos+1]))
-				pos++
+		// Read custom glyph names (only those beyond standard names)
+		var customNames []string
+		for {
+			if pos+1 > len(data) {
+				break
+			}
+			nameLen := int(getUint8(data[pos : pos+1]))
+			pos++
+			
+			if nameLen == 0 || pos+nameLen > len(data) {
+				break
+			}
+			customNames = append(customNames, FromCharCodeByte(data[pos:pos+nameLen]))
+			pos += nameLen
+		}
 
-				if nameLen < 0 || pos+nameLen > len(data) {
-					log.Printf("[WARNING] GetPost: format 2 custom name data truncated, need %d bytes but only %d available at pos %d for glyph %d", nameLen, len(data)-pos, pos, i)
-					break
+		// Build final names array: map glyphNameIndex to actual names
+		for i := 0; i < numberOfGlyphs; i++ {
+			idx := int(post.GlyphNameIndex[i])
+			if idx < len(standardNames) {
+				post.Names = append(post.Names, standardNames[idx])
+			} else {
+				customIdx := idx - len(standardNames)
+				if customIdx < len(customNames) {
+					post.Names = append(post.Names, customNames[customIdx])
+				} else {
+					post.Names = append(post.Names, ".notdef")
 				}
-				post.Names = append(post.Names, FromCharCodeByte(data[pos:pos+nameLen]))
-				pos += nameLen
 			}
 		}
 	} else if format == 2.5 {
@@ -3384,8 +3394,137 @@ func GetPost(data []byte, pos int) (post *Post) {
 			post.Offset = append(post.Offset, getInt8(data[pos:pos+1]))
 			pos++
 		}
+	} else if format == 3 {
+		// Format 3: No glyph names are stored; keep defaults
+		post.Names = nil
+	} else if format == 4 {
+		// Format 4: Not supported (rare). Spec says this table should be ignored.
+		log.Printf("[WARNING] GetPost: format 4 is not supported; ignoring glyph names")
 	}
 	return
+}
+
+func WritePost(post *Post) []byte {
+	data := []byte{}
+
+	// Header (32 bytes)
+	data = append(data, writeFixed(post.Format)...)
+	data = append(data, writeFixed(post.ItalicAngle)...)
+	data = append(data, writeFWord(post.UnderlinePosition)...)
+	data = append(data, writeFWord(post.UnderlineThickness)...)
+	data = append(data, writeUint32(post.IsFixedPitch)...)
+	data = append(data, writeUint32(post.MinMemType42)...)
+	data = append(data, writeUint32(post.MaxMemType42)...)
+	data = append(data, writeUint32(post.MinMemType1)...)
+	data = append(data, writeUint32(post.MaxMemType1)...)
+
+	switch post.Format {
+	case 1:
+		// Format 1 stores no extra data (uses standard Macintosh glyph order)
+		return data
+	case 2:
+		// Format 2: custom glyph names
+		glyphCount := int(post.NumberOfGlyphs)
+		if glyphCount == 0 {
+			if len(post.Names) > 0 {
+				glyphCount = len(post.Names)
+			} else if len(post.GlyphNameIndex) > 0 {
+				glyphCount = len(post.GlyphNameIndex)
+			}
+		}
+		if glyphCount == 0 {
+			return data
+		}
+
+		// Map of standard names for quick lookup
+		standardIndex := make(map[string]int, len(standardNames))
+		for i, name := range standardNames {
+			standardIndex[name] = i
+		}
+
+		glyphIndices := make([]uint16, glyphCount)
+		customNames := []string{}
+		customIndex := map[string]int{}
+
+		if len(post.Names) >= glyphCount {
+			// Build indices based on provided Names
+			for i := 0; i < glyphCount; i++ {
+				name := post.Names[i]
+				if idx, ok := standardIndex[name]; ok {
+					glyphIndices[i] = uint16(idx)
+					continue
+				}
+				if ci, ok := customIndex[name]; ok {
+					glyphIndices[i] = uint16(len(standardNames) + ci)
+				} else {
+					ci = len(customNames)
+					customIndex[name] = ci
+					customNames = append(customNames, name)
+					glyphIndices[i] = uint16(len(standardNames) + ci)
+				}
+			}
+		} else {
+			// Fallback: use provided GlyphNameIndex
+			for i := 0; i < glyphCount; i++ {
+				if i < len(post.GlyphNameIndex) {
+					idx := post.GlyphNameIndex[i]
+					if int(idx) >= len(standardNames) && len(post.Names) == 0 {
+						// Avoid referencing missing custom names; clamp to .notdef
+						idx = 0
+					}
+					glyphIndices[i] = idx
+				}
+			}
+			// Collect custom names if provided
+			if len(post.Names) > 0 {
+				for _, name := range post.Names {
+					if _, ok := standardIndex[name]; ok {
+						continue
+					}
+					if _, ok := customIndex[name]; !ok {
+						customIndex[name] = len(customNames)
+						customNames = append(customNames, name)
+					}
+				}
+			}
+		}
+
+		data = append(data, writeUint16(uint16(glyphCount))...)
+		for _, idx := range glyphIndices {
+			data = append(data, writeUint16(idx)...)
+		}
+		// Append custom names in the order they were collected
+		for _, name := range customNames {
+			b := []byte(name)
+			if len(b) > 255 {
+				b = b[:255]
+			}
+			data = append(data, writeUint8(uint8(len(b)))...)
+			data = append(data, b...)
+		}
+	case 2.5:
+		// Format 2.5: offsets array
+		glyphCount := int(post.NumberOfGlyphs)
+		if glyphCount == 0 {
+			glyphCount = len(post.Offset)
+		}
+		data = append(data, writeUint16(uint16(glyphCount))...)
+		for i := 0; i < glyphCount; i++ {
+			var off int8
+			if i < len(post.Offset) {
+				off = post.Offset[i]
+			}
+			data = append(data, writeInt8(off)...)
+		}
+	case 3:
+		// Format 3 stores only the header
+		return data
+	case 4:
+		// Format 4 is unsupported; per spec this table is ignored
+		return data
+	}
+
+	return data
 }
 
 type SfntVariationAxis struct {
