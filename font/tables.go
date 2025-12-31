@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"unicode/utf16"
+
+	"golang.org/x/text/date"
 )
 
 type OffsetTable struct {
@@ -2582,6 +2584,28 @@ func GetHhea(data []byte, pos int) (hhea *Hhea) {
 	return
 }
 
+func WriteHhea(hhea *Hhea) []byte {
+	data := []byte{}
+	data = append(data, writeFixed(hhea.Version)...)
+	data = append(data, writeFWord(hhea.Ascent)...)
+	data = append(data, writeFWord(hhea.Descent)...)
+	data = append(data, writeFWord(hhea.LineGap)...)
+	data = append(data, writeUFWord(hhea.AdvanceWidthMax)...)
+	data = append(data, writeFWord(hhea.MinLeftSideBearing)...)
+	data = append(data, writeFWord(hhea.MinRightSideBearing)...)
+	data = append(data, writeFWord(hhea.XMaxExtent)...)
+	data = append(data, writeInt16(hhea.CaretSlopeRise)...)
+	data = append(data, writeInt16(hhea.CaretSlopeRun)...)
+	data = append(data, writeInt16(hhea.CaretOffset)...)
+	data = append(data, writeInt16(hhea.Reserved1)...)
+	data = append(data, writeInt16(hhea.Reserved2)...)
+	data = append(data, writeInt16(hhea.Reserved3)...)
+	data = append(data, writeInt16(hhea.Reserved4)...)
+	data = append(data, writeInt16(hhea.MetricDataFormat)...)
+	data = append(data, writeUint16(hhea.NumOfLongHorMetrics)...)
+	return data
+}
+
 type LongHorMetric struct {
 	AdvanceWidth    uint16 `json:"advanceWidth"`
 	LeftSideBearing int16  `json:"leftSideBearing"`
@@ -2608,6 +2632,23 @@ func GetHmtx(data []byte, pos int, numOfLongHorMetrics int, numGlyph int) (hmtx 
 		pos += 2
 	}
 	return
+}
+
+func WriteHmtx(hmtx *Hmtx) []byte {
+	data := []byte{}
+	
+	// Write all LongHorMetric entries
+	for _, metric := range hmtx.HMetrics {
+		data = append(data, writeUint16(metric.AdvanceWidth)...)
+		data = append(data, writeInt16(metric.LeftSideBearing)...)
+	}
+	
+	// Write additional LeftSideBearing entries
+	for _, lsb := range hmtx.LeftSideBearing {
+		data = append(data, writeInt16(lsb)...)
+	}
+	
+	return data
 }
 
 type nPairs struct {
@@ -2821,30 +2862,196 @@ type Kern struct {
 
 func GetKern(data []byte, pos int) (kern *Kern, err error) {
 	kern = new(Kern)
+	
+	// Check if it's Windows format (version 0) or Mac format (version 1)
+	// Windows: version (uint16) + nTables (uint16)
+	// Mac: version (uint32) + nTables (uint32) or version (uint16) + nTables (uint16) for old format
 	version := int(getUint16(data[pos : pos+2]))
-	nTables := int(getUint16(data[pos+2 : pos+4]))
-	kern.Version = version
-	kern.NTables = nTables
+	
 	if version == 0 {
+		// Windows kern table format
+		kern.Version = 0
+		kern.NTables = int(getUint16(data[pos+2 : pos+4]))
 		pos += 4
 		kern.SubHeaders, kern.Pairs, kern.Format2 = getWindowsKernTable(data, pos)
 		return
 	} else if version == 1 {
-		var isNewKern bool
+		// Mac kern table format (old style: version is uint16)
+		kern.Version = 1
+		nTables := int(getUint16(data[pos+2 : pos+4]))
+		kern.NTables = nTables
+		kern.IsMacNewKern = false
 		pos += 4
-		// If nTables is 0, use new Mac kern header.
-		if nTables == 0 {
-			isNewKern = true
-			nTables = int(getUint32(data[pos : pos+4]))
-			pos += 4
-		}
-		kern.IsMacNewKern = isNewKern
 		kern.SubHeaders, kern.Pairs, kern.Format2, kern.Format3 = getMacKernTable(data, pos, nTables)
 		return
+	} else if version == 0x0001 {
+		// Check if it's actually new Mac kern format (version 1.0 as Fixed = 0x00010000)
+		// In new Mac format, first 4 bytes are version as Fixed (1.0 = 0x00010000)
+		fullVersion := getUint32(data[pos : pos+4])
+		if fullVersion == 0x00010000 {
+			kern.Version = 1
+			kern.IsMacNewKern = true
+			kern.NTables = int(getUint32(data[pos+4 : pos+8]))
+			pos += 8
+			kern.SubHeaders, kern.Pairs, kern.Format2, kern.Format3 = getMacKernTable(data, pos, kern.NTables)
+			return
+		}
 	}
 
 	err = errors.New("Unsupported kern table version:" + strconv.Itoa(version))
 	return
+}
+
+func WriteKern(kern *Kern) []byte {
+	data := []byte{}
+	
+	if kern.Version == 0 {
+		// Windows kern table
+		data = append(data, writeUint16(uint16(kern.Version))...)
+		data = append(data, writeUint16(uint16(kern.NTables))...)
+		
+		// Write subtable
+		data = append(data, writeWindowsKernSubtable(kern)...)
+	} else if kern.Version == 1 {
+		// Mac kern table
+		data = append(data, writeUint32(uint32(kern.Version))...)
+		
+		if kern.IsMacNewKern {
+			data = append(data, writeUint32(uint32(kern.NTables))...)
+		} else {
+			data = append(data, writeUint16(uint16(kern.NTables))...)
+			data = append(data, writeUint16(0)...) // padding
+		}
+		
+		// Write subtable
+		data = append(data, writeMacKernSubtable(kern)...)
+	}
+	
+	return data
+}
+
+func writeWindowsKernSubtable(kern *Kern) []byte {
+	data := []byte{}
+	
+	if kern.SubHeaders == nil {
+		return data
+	}
+	
+	format := kern.SubHeaders["format"]
+	
+	if format == 0 && kern.Pairs != nil {
+		// Format 0: ordered list of kerning pairs
+		nPairs := len(kern.Pairs)
+		searchRange := (1 << uint(log2(nPairs))) * 6
+		entrySelector := log2(searchRange / 6)
+		rangeShift := nPairs*6 - searchRange
+		
+		// Calculate length: header (14 bytes) + pairs (6 bytes each)
+		length := 14 + nPairs*6
+		
+		data = append(data, writeUint16(uint16(kern.SubHeaders["version"]))...)
+		data = append(data, writeUint16(uint16(length))...)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
+		data = append(data, writeUint16(uint16(nPairs))...)
+		data = append(data, writeUint16(uint16(searchRange))...)
+		data = append(data, writeUint16(uint16(entrySelector))...)
+		data = append(data, writeUint16(uint16(rangeShift))...)
+		
+		for _, pair := range kern.Pairs {
+			data = append(data, writeUint16(pair.Left)...)
+			data = append(data, writeUint16(pair.Right)...)
+			data = append(data, writeFWord(pair.Value)...)
+		}
+	} else if format == 2 && kern.Format2 != nil {
+		// Format 2: not commonly used, basic structure
+		data = append(data, writeUint16(0)...) // version
+		data = append(data, writeUint16(0)...) // length (would need calculation)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
+		data = append(data, writeUint16(kern.Format2.RowWidth)...)
+		data = append(data, writeUint16(kern.Format2.LeftOffsetTable)...)
+		data = append(data, writeUint16(kern.Format2.RightOffsetTable)...)
+		data = append(data, writeUint16(kern.Format2.ArrayOffset)...)
+	}
+	
+	return data
+}
+
+func writeMacKernSubtable(kern *Kern) []byte {
+	data := []byte{}
+	
+	if kern.SubHeaders == nil {
+		return data
+	}
+	
+	format := kern.SubHeaders["format"]
+	
+	if format == 0 && kern.Pairs != nil {
+		// Format 0: ordered list of kerning pairs
+		nPairs := len(kern.Pairs)
+		searchRange := (1 << uint(log2(nPairs))) * 6
+		entrySelector := log2(searchRange / 6)
+		rangeShift := nPairs*6 - searchRange
+		
+		// Calculate length: header (16 bytes) + pairs (6 bytes each)
+		length := 16 + nPairs*6
+		
+		data = append(data, writeUint32(uint32(length))...)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["tupleIndex"]))...)
+		data = append(data, writeUint16(uint16(nPairs))...)
+		data = append(data, writeUint16(uint16(searchRange))...)
+		data = append(data, writeUint16(uint16(entrySelector))...)
+		data = append(data, writeUint16(uint16(rangeShift))...)
+		
+		for _, pair := range kern.Pairs {
+			data = append(data, writeUint16(pair.Left)...)
+			data = append(data, writeUint16(pair.Right)...)
+			data = append(data, writeFWord(pair.Value)...)
+		}
+	} else if format == 3 && kern.Format3 != nil {
+		// Format 3: simple n×m index array
+		f3 := kern.Format3
+		
+		// Calculate length
+		length := 14 + len(f3.KernValues)*2 + len(f3.LeftClass) + len(f3.RightClass) + len(f3.KernIndex)
+		
+		data = append(data, writeUint32(uint32(length))...)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
+		data = append(data, writeUint16(uint16(kern.SubHeaders["tupleIndex"]))...)
+		data = append(data, writeUint16(f3.GlyphCount)...)
+		data = append(data, f3.KernValueCount)
+		data = append(data, f3.LeftClassCount)
+		data = append(data, f3.RightClassCount)
+		data = append(data, f3.Flags)
+		
+		// Write kern values
+		for _, val := range f3.KernValues {
+			data = append(data, writeFWord(val)...)
+		}
+		
+		// Write left class array
+		data = append(data, f3.LeftClass...)
+		
+		// Write right class array
+		data = append(data, f3.RightClass...)
+		
+		// Write kern index array
+		data = append(data, f3.KernIndex...)
+	}
+	
+	return data
+}
+
+func log2(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	log := 0
+	for n > 1 {
+		n >>= 1
+		log++
+	}
+	return log
 }
 
 type FastSetKVOpt struct {
@@ -2958,6 +3165,97 @@ func GetOS2(data []byte, pos int) (os2 *OS2) {
 	}
 
 	return
+}
+
+func WriteOS2(os2 *OS2) []byte {
+	data := []byte{}
+	version := int(os2.Version)
+	
+	// Write common fields (all versions)
+	data = append(data, writeUint16(os2.Version)...)
+	data = append(data, writeInt16(os2.XAvgCharWidth)...)
+	data = append(data, writeUint16(os2.UsWeightClass)...)
+	data = append(data, writeUint16(os2.UsWidthClass)...)
+	data = append(data, writeInt16(os2.FsType)...)
+	data = append(data, writeInt16(os2.YSubscriptXSize)...)
+	data = append(data, writeInt16(os2.YSubscriptYSize)...)
+	data = append(data, writeInt16(os2.YSubscriptXOffset)...)
+	data = append(data, writeInt16(os2.YSubscriptYOffset)...)
+	data = append(data, writeInt16(os2.YSuperscriptXSize)...)
+	data = append(data, writeInt16(os2.YSuperscriptYSize)...)
+	data = append(data, writeInt16(os2.YSuperscriptXOffset)...)
+	data = append(data, writeInt16(os2.YSuperscriptYOffset)...)
+	data = append(data, writeInt16(os2.YStrikeoutSize)...)
+	data = append(data, writeInt16(os2.YStrikeoutPosition)...)
+	data = append(data, writeInt16(os2.SFamilyClass)...)
+	
+	// Write Panose (10 bytes)
+	for i := 0; i < 10; i++ {
+		if i < len(os2.Panose) {
+			data = append(data, os2.Panose[i])
+		} else {
+			data = append(data, 0)
+		}
+	}
+	
+	// Write UlUnicodeRange (4 uint32s = 16 bytes)
+	for i := 0; i < 4; i++ {
+		if i < len(os2.UlUnicodeRange) {
+			data = append(data, writeUint32(os2.UlUnicodeRange[i])...)
+		} else {
+			data = append(data, writeUint32(0)...)
+		}
+	}
+	
+	// Write achVendID (4 bytes)
+	achVendID := []byte(os2.AchVendID)
+	for i := 0; i < 4; i++ {
+		if i < len(achVendID) {
+			data = append(data, achVendID[i])
+		} else {
+			data = append(data, ' ')
+		}
+	}
+	
+	data = append(data, writeUint16(os2.FsSelection)...)
+	data = append(data, writeUint16(os2.FsFirstCharIndex)...)
+	data = append(data, writeUint16(os2.FsLastCharIndex)...)
+	data = append(data, writeInt16(os2.STypoAscender)...)
+	data = append(data, writeInt16(os2.STypoDescender)...)
+	data = append(data, writeInt16(os2.STypoLineGap)...)
+	data = append(data, writeUint16(os2.UsWinAscent)...)
+	data = append(data, writeUint16(os2.UsWinDescent)...)
+	
+	// Version 1+ fields
+	if version >= 1 {
+		if len(os2.UlCodePageRange) > 0 {
+			data = append(data, writeUint32(os2.UlCodePageRange[0])...)
+		} else {
+			data = append(data, writeUint32(0)...)
+		}
+		if len(os2.UlCodePageRange) > 1 {
+			data = append(data, writeUint32(os2.UlCodePageRange[1])...)
+		} else {
+			data = append(data, writeUint32(0)...)
+		}
+	}
+	
+	// Version 2+ fields
+	if version >= 2 {
+		data = append(data, writeInt16(os2.SxHeight)...)
+		data = append(data, writeInt16(os2.SCapHeight)...)
+		data = append(data, writeUint16(os2.UsDefaultChar)...)
+		data = append(data, writeUint16(os2.UsBreakChar)...)
+		data = append(data, writeUint16(os2.UsMaxContext)...)
+	}
+	
+	// Version 5 fields
+	if version >= 5 {
+		data = append(data, writeUint16(os2.UsLowerPointSize)...)
+		data = append(data, writeUint16(os2.UsUpperPointSize)...)
+	}
+	
+	return data
 }
 
 var standardNames = []string{
