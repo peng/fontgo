@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"strconv"
+	"strings"
 	"unicode/utf16"
 )
 
@@ -3644,6 +3645,125 @@ func GetFvar(data []byte, pos int) (fvar *Fvar) {
 	}
 
 	return fvar
+}
+
+func WriteFvar(fvar *Fvar) []byte {
+	data := []byte{}
+
+	// Derive counts and sizes if missing
+	axisCount := len(fvar.Axis)
+	if fvar.AxisCount == 0 {
+		fvar.AxisCount = uint16(axisCount)
+	}
+	if fvar.AxisSize == 0 {
+		// Spec: axis record size is 20 bytes
+		fvar.AxisSize = 20
+	}
+
+	instCount := len(fvar.Instance)
+	if fvar.InstanceCount == 0 {
+		fvar.InstanceCount = uint16(instCount)
+	}
+
+	axisCountInt := int(fvar.AxisCount)
+	minInstSize := 4 + axisCountInt*4 // nameID + flags + coords
+	instSize := int(fvar.InstanceSize)
+	if instSize == 0 {
+		// If any instance has PsNameID set, include it
+		needsPS := false
+		for _, inst := range fvar.Instance {
+			if inst != nil && inst.PsNameID != 0 {
+				needsPS = true
+				break
+			}
+		}
+		if needsPS {
+			instSize = minInstSize + 2
+		} else {
+			instSize = minInstSize
+		}
+		fvar.InstanceSize = uint16(instSize)
+	}
+
+	// OffsetToData default: header is 16 bytes
+	if fvar.OffsetToData == 0 {
+		fvar.OffsetToData = 16
+	}
+
+	// Parse version (stored as two uint16)
+	major, minor := parseVersionToUint16(fvar.Version)
+	data = append(data, writeUint16(major)...)
+	data = append(data, writeUint16(minor)...)
+	data = append(data, writeUint16(fvar.OffsetToData)...)
+	data = append(data, writeUint16(fvar.CountSizePairs)...)
+	data = append(data, writeUint16(fvar.AxisCount)...)
+	data = append(data, writeUint16(fvar.AxisSize)...)
+	data = append(data, writeUint16(fvar.InstanceCount)...)
+	data = append(data, writeUint16(fvar.InstanceSize)...)
+
+	// Axis records
+	for _, axis := range fvar.Axis {
+		if axis == nil {
+			continue
+		}
+		data = append(data, writeUint32(axis.AxisTag)...)
+		data = append(data, writeFixed32(axis.MinValue)...)
+		data = append(data, writeFixed32(axis.DefaultValue)...)
+		data = append(data, writeFixed32(axis.MaxValue)...)
+		data = append(data, writeUint16(axis.Flags)...)
+		data = append(data, writeUint16(axis.NameID)...)
+	}
+
+	// Instance records
+	for _, inst := range fvar.Instance {
+		if inst == nil {
+			continue
+		}
+		data = append(data, writeUint16(inst.NameID)...)
+		data = append(data, writeUint16(inst.Flags)...)
+		for c := 0; c < axisCountInt; c++ {
+			var coord uint32
+			if c < len(inst.Coordinates) {
+				coord = inst.Coordinates[c]
+			}
+			data = append(data, writeFixed32(coord)...)
+		}
+		// Optional PostScript name ID if InstanceSize allows
+		if instSize >= minInstSize+2 {
+			data = append(data, writeUint16(inst.PsNameID)...)
+		}
+		// If instance size is larger than expected, pad with zeros
+		written := instSize
+		expected := minInstSize
+		if instSize >= minInstSize+2 {
+			expected = minInstSize + 2
+		}
+		if extra := written - expected; extra > 0 {
+			data = append(data, make([]byte, extra)...)
+		}
+	}
+
+	return data
+}
+
+// parseVersionToUint16 splits version string like "1.0" into two uint16 parts; defaults to 1.0
+func parseVersionToUint16(ver string) (uint16, uint16) {
+	major, minor := uint16(1), uint16(0)
+	if ver == "" {
+		return major, minor
+	}
+	parts := strings.Split(ver, ".")
+	if len(parts) > 0 {
+		if v, err := strconv.Atoi(parts[0]); err == nil && v >= 0 && v <= 0xFFFF {
+			major = uint16(v)
+		}
+	}
+	if len(parts) > 1 {
+		if v, err := strconv.Atoi(parts[1]); err == nil && v >= 0 && v <= 0xFFFF {
+			minor = uint16(v)
+		}
+	}
+	return major, minor
 }
 
 // axesCountTotalSize helper returns total bytes occupied by all axis records
