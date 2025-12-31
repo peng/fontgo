@@ -3935,3 +3935,57 @@ func GetMeta(data []byte, pos int) (meta *Meta, err error) {
 	meta.Tags = tags
 	return
 }
+
+func WriteMeta(meta *Meta) []byte {
+	data := []byte{}
+
+	// Prepare tags in deterministic order
+	keys := make([]string, 0, len(meta.Tags))
+	for k := range meta.Tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	numMaps := len(keys)
+	if meta.NumDataMaps == 0 {
+		meta.NumDataMaps = uint32(numMaps)
+	}
+
+	version := meta.Version
+	if version == 0 {
+		version = 1
+	}
+
+	// Header (16 bytes): version, flags, dataOffset, numDataMaps
+	dataStart := 16 + numMaps*12
+	data = append(data, writeUint32(version)...)
+	data = append(data, writeUint32(meta.Flags)...)
+	data = append(data, writeUint32(uint32(dataStart))...)
+	data = append(data, writeUint32(uint32(numMaps))...)
+
+	// Records and data payload
+	records := []byte{}
+	payload := []byte{}
+
+	for _, k := range keys {
+		v := meta.Tags[k]
+		text := []byte(v)
+		offset := len(payload)
+		length := len(text)
+
+		tagBytes := []byte(k)
+		tagBuf := []byte{0, 0, 0, 0}
+		copy(tagBuf, tagBytes)
+
+		records = append(records, tagBuf...)
+		records = append(records, writeUint32(uint32(offset))...)
+		records = append(records, writeUint32(uint32(length))...)
+
+		payload = append(payload, text...)
+	}
+
+	data = append(data, records...)
+	data = append(data, payload...)
+
+	return data
+}
