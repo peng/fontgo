@@ -115,7 +115,7 @@ func (f *Font) GetFontInfo() (fontInfo *FontInfo, err error) {
 	}
 
 	if existLtag {
-		ltag, ltagErr := GetItag(fileByte, int(itagInfo.Offset))
+		ltag, ltagErr := GetLtag(fileByte, int(itagInfo.Offset))
 		if ltagErr == nil {
 			tables.Ltag = ltag
 		}

@@ -1900,8 +1900,8 @@ func TestGetLocaFormat0Synthetic(t *testing.T) {
 	}
 }
 
-// TestGetItag verifies GetItag parses a simple itag table and returns errors on truncated data.
-func TestGetItag(t *testing.T) {
+// TestGetLtag verifies GetLtag parses a simple itag table and returns errors on truncated data.
+func TestGetLtag(t *testing.T) {
 	// Construct a valid itag table with two tags: "cat" and "doll"
 	// layout:
 	// version (4) = 1
@@ -1924,12 +1924,12 @@ func TestGetItag(t *testing.T) {
 		'd', 'o', 'l', 'l',
 	}
 
-	itag, err := GetItag(valid, 0)
+	itag, err := GetLtag(valid, 0)
 	if err != nil {
-		t.Fatalf("GetItag valid returned error: %v", err)
+		t.Fatalf("GetLtag valid returned error: %v", err)
 	}
 	if itag == nil {
-		t.Fatalf("GetItag valid returned nil itag")
+		t.Fatalf("GetLtag valid returned nil itag")
 	}
 	if int(itag.NumTags) != 2 {
 		t.Fatalf("expected NumTags=2 got %d", itag.NumTags)
@@ -1943,7 +1943,7 @@ func TestGetItag(t *testing.T) {
 
 	// Truncated header (less than 12 bytes)
 	shortHeader := []byte{0x00, 0x00, 0x00}
-	_, err = GetItag(shortHeader, 0)
+	_, err = GetLtag(shortHeader, 0)
 	if err == nil {
 		t.Fatalf("expected error for truncated header, got nil")
 	}
@@ -1955,7 +1955,7 @@ func TestGetItag(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01, // numTags = 1
 		// missing 4 bytes for record
 	}
-	_, err = GetItag(badRecords, 0)
+	_, err = GetLtag(badRecords, 0)
 	if err == nil {
 		t.Fatalf("expected error for truncated records, got nil")
 	}
@@ -1970,7 +1970,7 @@ func TestGetItag(t *testing.T) {
 		// only provide a few bytes after
 		'a', 'b', 'c',
 	}
-	_, err = GetItag(truncatedData, 0)
+	_, err = GetLtag(truncatedData, 0)
 	if err == nil {
 		t.Fatalf("expected error for truncated tag data, got nil")
 	}

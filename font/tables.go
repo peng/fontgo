@@ -3777,7 +3777,7 @@ type Ltag struct {
 	TagRange []string `json:"tagRange"`
 }
 
-func GetItag(data []byte, pos int) (ltag *Ltag, err error) {
+func GetLtag(data []byte, pos int) (ltag *Ltag, err error) {
 	start := pos
 	ltag = new(Ltag)
 	// basic bounds: need at least 12 bytes for version, flags, numTags
