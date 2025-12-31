@@ -3822,6 +3822,51 @@ func GetLtag(data []byte, pos int) (ltag *Ltag, err error) {
 	return
 }
 
+func WriteLtag(ltag *Ltag) []byte {
+	data := []byte{}
+	
+	// Set defaults if not provided
+	version := ltag.Version
+	if version == 0 {
+		version = 1
+	}
+	
+	numTags := len(ltag.TagRange)
+	if ltag.NumTags == 0 {
+		ltag.NumTags = uint32(numTags)
+	}
+	
+	// Header: version (4) + flags (4) + numTags (4) = 12 bytes
+	data = append(data, writeUint32(version)...)
+	data = append(data, writeUint32(0)...) // flags (reserved, always 0)
+	data = append(data, writeUint32(uint32(numTags))...)
+	
+	// Calculate offsets for tag strings
+	// Tag records start at 12, each record is 4 bytes (offset + length)
+	// String data starts after all tag records
+	stringDataStart := 12 + numTags*4
+	
+	// Build tag records and string data
+	stringData := []byte{}
+	for _, tag := range ltag.TagRange {
+		tagBytes := []byte(tag)
+		offset := stringDataStart + len(stringData)
+		length := len(tagBytes)
+		
+		// Write tag record (offset + length)
+		data = append(data, writeUint16(uint16(offset))...)
+		data = append(data, writeUint16(uint16(length))...)
+		
+		// Accumulate string data
+		stringData = append(stringData, tagBytes...)
+	}
+	
+	// Append all string data
+	data = append(data, stringData...)
+	
+	return data
+}
+
 type Meta struct {
 	Version     uint32            `json:"version"`
 	Flags       uint32            `json:"flags"`
