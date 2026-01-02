@@ -89,7 +89,16 @@ func GetTableContent(numTables int, date []byte) TableContent {
 
 func WriteTableContent(tableContent TableContent) []byte {
 	data := []byte{}
-	for tagName, tagItem := range tableContent {
+	// The TrueType specification requires table directory entries to be sorted by Tag in ascending order.
+	// Sort tags here to ensure stable output.
+	keys := make([]string, 0, len(tableContent))
+	for tag := range tableContent {
+		keys = append(keys, tag)
+	}
+	sort.Strings(keys)
+
+	for _, tagName := range keys {
+		tagItem := tableContent[tagName]
 		data = append(data, writeString(tagName)...)
 
 		data = append(data, writeUint32(tagItem.CheckSum)...)
@@ -688,13 +697,13 @@ func GetMaxp(data []byte, pos int) *Maxp {
 	maxp := new(Maxp)
 	maxp.Version = getVersion(data[pos : pos+4])
 	maxp.NumGlyphs = getUint16(data[pos+4 : pos+6])
-	
+
 	// Version 0.5: TrueType without glyph outlines (CFF)
 	// Only Version and NumGlyphs; other fields remain 0
 	if maxp.Version == "0.5" {
 		return maxp
 	}
-	
+
 	// Version 1.0: TrueType with glyph outlines
 	if maxp.Version == "1.0" {
 		maxp.MaxPoints = getUint16(data[pos+6 : pos+8])
@@ -1570,17 +1579,17 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 			data = append(data, writeUint32(subTable["numVarSelectorRecords"].(uint32))...)
 
 			groups := subTable["groups"].([]interface{})
-			
+
 			// Group by varSelector to reconstruct the variation selector records
 			varSelectors := make(map[int]struct {
 				defaultUVS    []*CmapFormatDefaultUVS
 				nonDefaultUVS []*CmapFormatNonDefaultUVS
 			})
-			
+
 			for _, g := range groups {
 				groupItem := g.([]interface{})
 				typeVal := groupItem[0].(int)
-				
+
 				if typeVal == 0 {
 					// Default UVS
 					defaultUVS := groupItem[1].(*CmapFormatDefaultUVS)
@@ -1597,31 +1606,31 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					varSelectors[varSel] = rec
 				}
 			}
-			
+
 			// Sort varSelectors by key for consistent output
 			var varSelectorKeys []int
 			for k := range varSelectors {
 				varSelectorKeys = append(varSelectorKeys, k)
 			}
 			sort.Ints(varSelectorKeys)
-			
+
 			// Calculate offsets for variation selector records
 			// First, write variation selector records (header part)
 			headerSize := 4 + 4 + len(varSelectorKeys)*11 // length + numVarSelectorRecords + records
 			currentOffset := headerSize
-			
+
 			var varSelectorData []byte
 			var uvsTableData []byte
-			
+
 			for _, varSel := range varSelectorKeys {
 				rec := varSelectors[varSel]
-				
+
 				// Write variation selector (24-bit)
 				varSelectorData = append(varSelectorData, writeUint24(varSel)...)
-				
+
 				defaultUVSOffset := uint32(0)
 				nonDefaultUVSOffset := uint32(0)
-				
+
 				// Calculate and write default UVS table if present
 				var defaultUVSData []byte
 				if len(rec.defaultUVS) > 0 {
@@ -1634,7 +1643,7 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					}
 					currentOffset += len(defaultUVSData)
 				}
-				
+
 				// Calculate and write non-default UVS table if present
 				var nonDefaultUVSData []byte
 				if len(rec.nonDefaultUVS) > 0 {
@@ -1646,14 +1655,14 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					}
 					currentOffset += len(nonDefaultUVSData)
 				}
-				
+
 				varSelectorData = append(varSelectorData, writeUint32(defaultUVSOffset)...)
 				varSelectorData = append(varSelectorData, writeUint32(nonDefaultUVSOffset)...)
-				
+
 				uvsTableData = append(uvsTableData, defaultUVSData...)
 				uvsTableData = append(uvsTableData, nonDefaultUVSData...)
 			}
-			
+
 			data = append(data, varSelectorData...)
 			data = append(data, uvsTableData...)
 		}
@@ -2635,18 +2644,18 @@ func GetHmtx(data []byte, pos int, numOfLongHorMetrics int, numGlyph int) (hmtx 
 
 func WriteHmtx(hmtx *Hmtx) []byte {
 	data := []byte{}
-	
+
 	// Write all LongHorMetric entries
 	for _, metric := range hmtx.HMetrics {
 		data = append(data, writeUint16(metric.AdvanceWidth)...)
 		data = append(data, writeInt16(metric.LeftSideBearing)...)
 	}
-	
+
 	// Write additional LeftSideBearing entries
 	for _, lsb := range hmtx.LeftSideBearing {
 		data = append(data, writeInt16(lsb)...)
 	}
-	
+
 	return data
 }
 
@@ -2861,12 +2870,12 @@ type Kern struct {
 
 func GetKern(data []byte, pos int) (kern *Kern, err error) {
 	kern = new(Kern)
-	
+
 	// Check if it's Windows format (version 0) or Mac format (version 1)
 	// Windows: version (uint16) + nTables (uint16)
 	// Mac: version (uint32) + nTables (uint32) or version (uint16) + nTables (uint16) for old format
 	version := int(getUint16(data[pos : pos+2]))
-	
+
 	if version == 0 {
 		// Windows kern table format
 		kern.Version = 0
@@ -2903,51 +2912,51 @@ func GetKern(data []byte, pos int) (kern *Kern, err error) {
 
 func WriteKern(kern *Kern) []byte {
 	data := []byte{}
-	
+
 	if kern.Version == 0 {
 		// Windows kern table
 		data = append(data, writeUint16(uint16(kern.Version))...)
 		data = append(data, writeUint16(uint16(kern.NTables))...)
-		
+
 		// Write subtable
 		data = append(data, writeWindowsKernSubtable(kern)...)
 	} else if kern.Version == 1 {
 		// Mac kern table
 		data = append(data, writeUint32(uint32(kern.Version))...)
-		
+
 		if kern.IsMacNewKern {
 			data = append(data, writeUint32(uint32(kern.NTables))...)
 		} else {
 			data = append(data, writeUint16(uint16(kern.NTables))...)
 			data = append(data, writeUint16(0)...) // padding
 		}
-		
+
 		// Write subtable
 		data = append(data, writeMacKernSubtable(kern)...)
 	}
-	
+
 	return data
 }
 
 func writeWindowsKernSubtable(kern *Kern) []byte {
 	data := []byte{}
-	
+
 	if kern.SubHeaders == nil {
 		return data
 	}
-	
+
 	format := kern.SubHeaders["format"]
-	
+
 	if format == 0 && kern.Pairs != nil {
 		// Format 0: ordered list of kerning pairs
 		nPairs := len(kern.Pairs)
 		searchRange := (1 << uint(log2(nPairs))) * 6
 		entrySelector := log2(searchRange / 6)
 		rangeShift := nPairs*6 - searchRange
-		
+
 		// Calculate length: header (14 bytes) + pairs (6 bytes each)
 		length := 14 + nPairs*6
-		
+
 		data = append(data, writeUint16(uint16(kern.SubHeaders["version"]))...)
 		data = append(data, writeUint16(uint16(length))...)
 		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
@@ -2955,7 +2964,7 @@ func writeWindowsKernSubtable(kern *Kern) []byte {
 		data = append(data, writeUint16(uint16(searchRange))...)
 		data = append(data, writeUint16(uint16(entrySelector))...)
 		data = append(data, writeUint16(uint16(rangeShift))...)
-		
+
 		for _, pair := range kern.Pairs {
 			data = append(data, writeUint16(pair.Left)...)
 			data = append(data, writeUint16(pair.Right)...)
@@ -2971,29 +2980,29 @@ func writeWindowsKernSubtable(kern *Kern) []byte {
 		data = append(data, writeUint16(kern.Format2.RightOffsetTable)...)
 		data = append(data, writeUint16(kern.Format2.ArrayOffset)...)
 	}
-	
+
 	return data
 }
 
 func writeMacKernSubtable(kern *Kern) []byte {
 	data := []byte{}
-	
+
 	if kern.SubHeaders == nil {
 		return data
 	}
-	
+
 	format := kern.SubHeaders["format"]
-	
+
 	if format == 0 && kern.Pairs != nil {
 		// Format 0: ordered list of kerning pairs
 		nPairs := len(kern.Pairs)
 		searchRange := (1 << uint(log2(nPairs))) * 6
 		entrySelector := log2(searchRange / 6)
 		rangeShift := nPairs*6 - searchRange
-		
+
 		// Calculate length: header (16 bytes) + pairs (6 bytes each)
 		length := 16 + nPairs*6
-		
+
 		data = append(data, writeUint32(uint32(length))...)
 		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
 		data = append(data, writeUint16(uint16(kern.SubHeaders["tupleIndex"]))...)
@@ -3001,7 +3010,7 @@ func writeMacKernSubtable(kern *Kern) []byte {
 		data = append(data, writeUint16(uint16(searchRange))...)
 		data = append(data, writeUint16(uint16(entrySelector))...)
 		data = append(data, writeUint16(uint16(rangeShift))...)
-		
+
 		for _, pair := range kern.Pairs {
 			data = append(data, writeUint16(pair.Left)...)
 			data = append(data, writeUint16(pair.Right)...)
@@ -3010,10 +3019,10 @@ func writeMacKernSubtable(kern *Kern) []byte {
 	} else if format == 3 && kern.Format3 != nil {
 		// Format 3: simple n×m index array
 		f3 := kern.Format3
-		
+
 		// Calculate length
 		length := 14 + len(f3.KernValues)*2 + len(f3.LeftClass) + len(f3.RightClass) + len(f3.KernIndex)
-		
+
 		data = append(data, writeUint32(uint32(length))...)
 		data = append(data, writeUint16(uint16(kern.SubHeaders["coverage"]))...)
 		data = append(data, writeUint16(uint16(kern.SubHeaders["tupleIndex"]))...)
@@ -3022,22 +3031,22 @@ func writeMacKernSubtable(kern *Kern) []byte {
 		data = append(data, f3.LeftClassCount)
 		data = append(data, f3.RightClassCount)
 		data = append(data, f3.Flags)
-		
+
 		// Write kern values
 		for _, val := range f3.KernValues {
 			data = append(data, writeFWord(val)...)
 		}
-		
+
 		// Write left class array
 		data = append(data, f3.LeftClass...)
-		
+
 		// Write right class array
 		data = append(data, f3.RightClass...)
-		
+
 		// Write kern index array
 		data = append(data, f3.KernIndex...)
 	}
-	
+
 	return data
 }
 
@@ -3169,7 +3178,7 @@ func GetOS2(data []byte, pos int) (os2 *OS2) {
 func WriteOS2(os2 *OS2) []byte {
 	data := []byte{}
 	version := int(os2.Version)
-	
+
 	// Write common fields (all versions)
 	data = append(data, writeUint16(os2.Version)...)
 	data = append(data, writeInt16(os2.XAvgCharWidth)...)
@@ -3187,7 +3196,7 @@ func WriteOS2(os2 *OS2) []byte {
 	data = append(data, writeInt16(os2.YStrikeoutSize)...)
 	data = append(data, writeInt16(os2.YStrikeoutPosition)...)
 	data = append(data, writeInt16(os2.SFamilyClass)...)
-	
+
 	// Write Panose (10 bytes)
 	for i := 0; i < 10; i++ {
 		if i < len(os2.Panose) {
@@ -3196,7 +3205,7 @@ func WriteOS2(os2 *OS2) []byte {
 			data = append(data, 0)
 		}
 	}
-	
+
 	// Write UlUnicodeRange (4 uint32s = 16 bytes)
 	for i := 0; i < 4; i++ {
 		if i < len(os2.UlUnicodeRange) {
@@ -3205,7 +3214,7 @@ func WriteOS2(os2 *OS2) []byte {
 			data = append(data, writeUint32(0)...)
 		}
 	}
-	
+
 	// Write achVendID (4 bytes)
 	achVendID := []byte(os2.AchVendID)
 	for i := 0; i < 4; i++ {
@@ -3215,7 +3224,7 @@ func WriteOS2(os2 *OS2) []byte {
 			data = append(data, ' ')
 		}
 	}
-	
+
 	data = append(data, writeUint16(os2.FsSelection)...)
 	data = append(data, writeUint16(os2.FsFirstCharIndex)...)
 	data = append(data, writeUint16(os2.FsLastCharIndex)...)
@@ -3224,7 +3233,7 @@ func WriteOS2(os2 *OS2) []byte {
 	data = append(data, writeInt16(os2.STypoLineGap)...)
 	data = append(data, writeUint16(os2.UsWinAscent)...)
 	data = append(data, writeUint16(os2.UsWinDescent)...)
-	
+
 	// Version 1+ fields
 	if version >= 1 {
 		if len(os2.UlCodePageRange) > 0 {
@@ -3238,7 +3247,7 @@ func WriteOS2(os2 *OS2) []byte {
 			data = append(data, writeUint32(0)...)
 		}
 	}
-	
+
 	// Version 2+ fields
 	if version >= 2 {
 		data = append(data, writeInt16(os2.SxHeight)...)
@@ -3247,13 +3256,13 @@ func WriteOS2(os2 *OS2) []byte {
 		data = append(data, writeUint16(os2.UsBreakChar)...)
 		data = append(data, writeUint16(os2.UsMaxContext)...)
 	}
-	
+
 	// Version 5 fields
 	if version >= 5 {
 		data = append(data, writeUint16(os2.UsLowerPointSize)...)
 		data = append(data, writeUint16(os2.UsUpperPointSize)...)
 	}
-	
+
 	return data
 }
 
@@ -3354,7 +3363,7 @@ func GetPost(data []byte, pos int) (post *Post) {
 			}
 			nameLen := int(getUint8(data[pos : pos+1]))
 			pos++
-			
+
 			if nameLen == 0 || pos+nameLen > len(data) {
 				break
 			}
@@ -3824,46 +3833,46 @@ func GetLtag(data []byte, pos int) (ltag *Ltag, err error) {
 
 func WriteLtag(ltag *Ltag) []byte {
 	data := []byte{}
-	
+
 	// Set defaults if not provided
 	version := ltag.Version
 	if version == 0 {
 		version = 1
 	}
-	
+
 	numTags := len(ltag.TagRange)
 	if ltag.NumTags == 0 {
 		ltag.NumTags = uint32(numTags)
 	}
-	
+
 	// Header: version (4) + flags (4) + numTags (4) = 12 bytes
 	data = append(data, writeUint32(version)...)
 	data = append(data, writeUint32(0)...) // flags (reserved, always 0)
 	data = append(data, writeUint32(uint32(numTags))...)
-	
+
 	// Calculate offsets for tag strings
 	// Tag records start at 12, each record is 4 bytes (offset + length)
 	// String data starts after all tag records
 	stringDataStart := 12 + numTags*4
-	
+
 	// Build tag records and string data
 	stringData := []byte{}
 	for _, tag := range ltag.TagRange {
 		tagBytes := []byte(tag)
 		offset := stringDataStart + len(stringData)
 		length := len(tagBytes)
-		
+
 		// Write tag record (offset + length)
 		data = append(data, writeUint16(uint16(offset))...)
 		data = append(data, writeUint16(uint16(length))...)
-		
+
 		// Accumulate string data
 		stringData = append(stringData, tagBytes...)
 	}
-	
+
 	// Append all string data
 	data = append(data, stringData...)
-	
+
 	return data
 }
 
