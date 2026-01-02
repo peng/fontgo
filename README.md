@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-    f := font.readFontFile('font.ttf')
+    f := font.ReadFontFile('font.ttf')
     defer func() {
         if err := f.Close(); err != nil {
             fmt.Println(err)
