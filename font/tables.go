@@ -348,7 +348,7 @@ func GetGlyphSimple(data []byte, pos int, index int) (simple *GlyphSimple) {
 
 func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	data := []byte{}
-	// write glyph commom
+	// write glyph common
 	data = append(data, writeInt16(glyphSimple.GlyphCommon.NumberOfContours)...)
 	data = append(data, writeFWord(glyphSimple.GlyphCommon.XMin)...)
 	data = append(data, writeFWord(glyphSimple.GlyphCommon.YMin)...)
@@ -365,58 +365,39 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 	for _, ins := range glyphSimple.Instructions {
 		data = append(data, writeUint8(ins)...)
 	}
-	flagsData, xData, yData := []byte{}, []byte{}, []byte{}
-	var (
-		repeatFlagNum uint8
-		repeatNum     uint8
-	)
+
+	// Build flags without using Repeat optimization for simplicity and correctness
+	// This produces slightly larger output but is guaranteed correct
+	flagsData := []byte{}
+	xData := []byte{}
+	yData := []byte{}
+
 	for i := 0; i < len(glyphSimple.Points); i++ {
 		point := glyphSimple.Points[i]
-
-		// write flags
 		flag := point.Flag
+
+		// Compute flag byte (without Repeat bit - we're not using RLE)
 		var flagNum uint8
 		if flag.OnCurve {
-			flagNum += 0x01
+			flagNum |= 0x01
 		}
 		if flag.XShortVector {
-			flagNum += 0x02
+			flagNum |= 0x02
 		}
 		if flag.YShortVector {
-			flagNum += 0x04
+			flagNum |= 0x04
 		}
-		if flag.Repeat {
-			flagNum += 0x08
-		}
+		// Don't set Repeat bit (0x08) - we write each flag individually
 		if flag.XSame {
-			flagNum += 0x10
+			flagNum |= 0x10
 		}
 		if flag.YSame {
-			flagNum += 0x20
+			flagNum |= 0x20
 		}
 
-		if repeatFlagNum != 0 {
-			// has repeat
-			if repeatFlagNum == flagNum {
-				repeatNum++
-			} else {
-				flagsData = append(flagsData, writeUint8(repeatNum)...)
-				flagsData = append(flagsData, writeUint8(flagNum)...)
-				if flag.Repeat {
-					repeatFlagNum = flagNum
-				} else {
-					repeatFlagNum = 0
-				}
-				repeatNum = 0
-			}
-		} else {
-			if flag.Repeat {
-				repeatFlagNum = flagNum
-			}
-			flagsData = append(flagsData, writeUint8(flagNum)...)
-		}
+		flagsData = append(flagsData, writeUint8(flagNum)...)
 
-		// write x
+		// write x coordinate
 		x := point.X
 		if flag.XShortVector {
 			if !flag.XSame {
@@ -424,10 +405,10 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 			}
 			xData = append(xData, writeUint8(uint8(x))...)
 		} else if !flag.XSame {
-			xData = append(xData, writeUint16(uint16(x))...)
+			xData = append(xData, writeInt16(int16(x))...)
 		}
 
-		// write y
+		// write y coordinate
 		y := point.Y
 		if flag.YShortVector {
 			if !flag.YSame {
@@ -435,7 +416,7 @@ func WriteGlyphSimple(glyphSimple *GlyphSimple) []byte {
 			}
 			yData = append(yData, writeUint8(uint8(y))...)
 		} else if !flag.YSame {
-			yData = append(yData, writeUint16(uint16(y))...)
+			yData = append(yData, writeInt16(int16(y))...)
 		}
 	}
 
@@ -610,6 +591,11 @@ func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs)
 	glyphs = new(Glyphs)
 
 	for i := 0; i < numGlyphs; i++ {
+		// Check for empty glyph (loca[i] == loca[i+1])
+		if i+1 < len(loca) && loca[i] == loca[i+1] {
+			// Empty glyph, skip
+			continue
+		}
 
 		offset := loca[i]
 		// fmt.Printf("innoffset %v", offset)
@@ -631,48 +617,43 @@ func GetGlyphs(data []byte, pos int, loca []int, numGlyphs int) (glyphs *Glyphs)
 	return
 }
 
-func WriteGlyphs(glyphs *Glyphs) ([]byte, error) {
-	var (
-		data []byte
-	)
-	for i, simpPos, compPos := 0, 0, 0; i < (len(glyphs.Simples) + len(glyphs.Compounds)); i++ {
-		find := false
-		for simpPos < len(glyphs.Simples) {
-			simple := glyphs.Simples[simpPos]
-			if simple.GlyphCommon.Index > i {
-				break
-			}
-			if simple.GlyphCommon.Index == i {
-				data = append(data, WriteGlyphSimple(&simple)...)
-				find = true
-				simpPos++
-				break
-			}
-			simpPos++
-		}
-		if find {
-			continue
-		}
-
-		for compPos < len(glyphs.Compounds) {
-			compound := glyphs.Compounds[compPos]
-			if compound.GlyphCommon.Index > i {
-				break
-			}
-			if compound.GlyphCommon.Index == i {
-				data = append(data, WriteGlyphCompound(&compound)...)
-				find = true
-				compPos++
-				break
-			}
-			compPos++
-		}
-		if !find {
-			return data, errors.New("Match index error!")
-		}
+func WriteGlyphs(glyphs *Glyphs, numGlyphs int) (data []byte, loca []int, err error) {
+	if glyphs == nil {
+		return nil, nil, errors.New("glyphs is nil")
 	}
 
-	return data, nil
+	simpleMap := make(map[int]*GlyphSimple, len(glyphs.Simples))
+	for i := range glyphs.Simples {
+		s := &glyphs.Simples[i]
+		simpleMap[s.GlyphCommon.Index] = s
+	}
+	compoundMap := make(map[int]*GlyphCompound, len(glyphs.Compounds))
+	for i := range glyphs.Compounds {
+		c := &glyphs.Compounds[i]
+		compoundMap[c.GlyphCommon.Index] = c
+	}
+
+	loca = make([]int, numGlyphs+1)
+	currentOffset := 0
+	for i := 0; i < numGlyphs; i++ {
+		loca[i] = currentOffset
+		if s, ok := simpleMap[i]; ok {
+			glyphBytes := WriteGlyphSimple(s)
+			data = append(data, glyphBytes...)
+			currentOffset += len(glyphBytes)
+			continue
+		}
+		if c, ok := compoundMap[i]; ok {
+			glyphBytes := WriteGlyphCompound(c)
+			data = append(data, glyphBytes...)
+			currentOffset += len(glyphBytes)
+			continue
+		}
+		// missing glyph: empty body, only advance loca with same offset
+	}
+	loca[numGlyphs] = currentOffset
+
+	return data, loca, nil
 }
 
 type Maxp struct {
@@ -1457,148 +1438,121 @@ func GetCmap(data []byte, pos int, maxpNumGlyphs int) (cmap *Cmap, err error) {
 }
 
 func WriteCmap(cmap *Cmap) (data []byte, err error) {
-	data = append(data, writeUint16(cmap.Version)...)
-	data = append(data, writeUint16(cmap.NumberSubtables)...)
+	if cmap == nil {
+		return nil, errors.New("cmap is nil")
+	}
 
-	for _, subTable := range cmap.SubTables {
-		data = append(data, writeUint16(subTable["platformID"].(uint16))...)
-		data = append(data, writeUint16(subTable["platformSpecificID"].(uint16))...)
-		data = append(data, writeUint32(subTable["offset"].(uint32))...)
+	writeSubTable := func(subTable map[string]interface{}) ([]byte, error) {
+		buf := []byte{}
 		format, ok := subTable["format"].(uint16)
 		if !ok {
-			err = errors.New("cmap format int error")
-			return
+			return nil, errors.New("cmap format int error")
 		}
-		data = append(data, writeUint16(format)...)
-		if format == 0 {
-			data = append(data, writeUint16(subTable["length"].(uint16))...)
-			data = append(data, writeUint16(subTable["language"].(uint16))...)
+		buf = append(buf, writeUint16(format)...)
+		switch format {
+		case 0:
+			buf = append(buf, writeUint16(subTable["length"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["language"].(uint16))...)
 			glyphIndexArray := subTable["glyphIndexArray"].([]uint8)
-
 			for _, item := range glyphIndexArray {
-				data = append(data, writeUint8(item)...)
+				buf = append(buf, writeUint8(item)...)
 			}
-		} else if format == 2 {
-			data = append(data, writeUint16(subTable["length"].(uint16))...)
-			data = append(data, writeUint16(subTable["language"].(uint16))...)
-
+		case 2:
+			buf = append(buf, writeUint16(subTable["length"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["language"].(uint16))...)
 			for _, item := range subTable["subHeaderKeys"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
 			for _, item := range subTable["subHeaders"].([]*CmapFormat2SubHeader) {
-				data = append(data, writeUint16(item.FirstCode)...)
-				data = append(data, writeUint16(item.EntryCount)...)
-				data = append(data, writeInt16(item.IdDelta)...)
-				data = append(data, writeUint16(item.IdRangeOffset)...)
+				buf = append(buf, writeUint16(item.FirstCode)...)
+				buf = append(buf, writeUint16(item.EntryCount)...)
+				buf = append(buf, writeInt16(item.IdDelta)...)
+				buf = append(buf, writeUint16(item.IdRangeOffset)...)
 			}
-
 			for _, item := range subTable["glyphIndexArray"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-		} else if format == 4 {
-			data = append(data, writeUint16(subTable["length"].(uint16))...)
-			data = append(data, writeUint16(subTable["language"].(uint16))...)
-			data = append(data, writeUint16(subTable["segCountX2"].(uint16))...)
-			data = append(data, writeUint16(subTable["searchRange"].(uint16))...)
-			data = append(data, writeUint16(subTable["entrySelector"].(uint16))...)
-			data = append(data, writeUint16(subTable["rangeShift"].(uint16))...)
-
+		case 4:
+			buf = append(buf, writeUint16(subTable["length"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["language"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["segCountX2"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["searchRange"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["entrySelector"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["rangeShift"].(uint16))...)
 			for _, item := range subTable["endCode"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
-			data = append(data, writeUint16(subTable["reservedPad"].(uint16))...)
-
+			buf = append(buf, writeUint16(subTable["reservedPad"].(uint16))...)
 			for _, item := range subTable["startCode"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
 			for _, item := range subTable["idDelta"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
 			for _, item := range subTable["idRangeOffset"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
 			for _, item := range subTable["glyphIndexArray"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-		} else if format == 6 {
-			data = append(data, writeUint16(subTable["length"].(uint16))...)
-			data = append(data, writeUint16(subTable["language"].(uint16))...)
-			data = append(data, writeUint16(subTable["firstCode"].(uint16))...)
-			data = append(data, writeUint16(subTable["entryCount"].(uint16))...)
-
+		case 6:
+			buf = append(buf, writeUint16(subTable["length"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["language"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["firstCode"].(uint16))...)
+			buf = append(buf, writeUint16(subTable["entryCount"].(uint16))...)
 			for _, item := range subTable["glyphIndexArray"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-		} else if format == 8 {
-			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
-			data = append(data, writeUint32(subTable["length"].(uint32))...)
-			data = append(data, writeUint32(subTable["language"].(uint32))...)
-
+		case 8:
+			buf = append(buf, writeUint16(subTable["reserved"].(uint16))...)
+			buf = append(buf, writeUint32(subTable["length"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["language"].(uint32))...)
 			for _, item := range subTable["is32"].([]uint8) {
-				data = append(data, writeUint8(item)...)
+				buf = append(buf, writeUint8(item)...)
 			}
-
-			data = append(data, writeUint32(subTable["nGroups"].(uint32))...)
-
+			buf = append(buf, writeUint32(subTable["nGroups"].(uint32))...)
 			for _, item := range subTable["groups"].([]*CmapFormat8nGroup) {
-				data = append(data, writeUint32(item.StartCharCode)...)
-				data = append(data, writeUint32(item.EndCharCode)...)
-				data = append(data, writeUint32(item.StartGlyphCode)...)
+				buf = append(buf, writeUint32(item.StartCharCode)...)
+				buf = append(buf, writeUint32(item.EndCharCode)...)
+				buf = append(buf, writeUint32(item.StartGlyphCode)...)
 			}
-		} else if format == 10 {
-
-			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
-			data = append(data, writeUint32(subTable["length"].(uint32))...)
-			data = append(data, writeUint32(subTable["language"].(uint32))...)
-			data = append(data, writeUint32(subTable["startCharCode"].(uint32))...)
-			data = append(data, writeUint32(subTable["numChars"].(uint32))...)
-
+		case 10:
+			buf = append(buf, writeUint16(subTable["reserved"].(uint16))...)
+			buf = append(buf, writeUint32(subTable["length"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["language"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["startCharCode"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["numChars"].(uint32))...)
 			for _, item := range subTable["glyphs"].([]uint16) {
-				data = append(data, writeUint16(item)...)
+				buf = append(buf, writeUint16(item)...)
 			}
-
-		} else if format == 12 || format == 13 {
-			data = append(data, writeUint16(subTable["reserved"].(uint16))...)
-			data = append(data, writeUint32(subTable["length"].(uint32))...)
-			data = append(data, writeUint32(subTable["language"].(uint32))...)
-			data = append(data, writeUint32(subTable["nGroups"].(uint32))...)
-
+		case 12, 13:
+			buf = append(buf, writeUint16(subTable["reserved"].(uint16))...)
+			buf = append(buf, writeUint32(subTable["length"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["language"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["nGroups"].(uint32))...)
 			for _, item := range subTable["groups"].([]*CmapFormat8nGroup) {
-				data = append(data, writeUint32(item.StartCharCode)...)
-				data = append(data, writeUint32(item.EndCharCode)...)
-				data = append(data, writeUint32(item.StartGlyphCode)...)
+				buf = append(buf, writeUint32(item.StartCharCode)...)
+				buf = append(buf, writeUint32(item.EndCharCode)...)
+				buf = append(buf, writeUint32(item.StartGlyphCode)...)
 			}
-
-		} else if format == 14 {
-			data = append(data, writeUint32(subTable["length"].(uint32))...)
-			data = append(data, writeUint32(subTable["numVarSelectorRecords"].(uint32))...)
-
+		case 14:
+			buf = append(buf, writeUint32(subTable["length"].(uint32))...)
+			buf = append(buf, writeUint32(subTable["numVarSelectorRecords"].(uint32))...)
 			groups := subTable["groups"].([]interface{})
-
-			// Group by varSelector to reconstruct the variation selector records
 			varSelectors := make(map[int]struct {
 				defaultUVS    []*CmapFormatDefaultUVS
 				nonDefaultUVS []*CmapFormatNonDefaultUVS
 			})
-
 			for _, g := range groups {
 				groupItem := g.([]interface{})
 				typeVal := groupItem[0].(int)
-
 				if typeVal == 0 {
-					// Default UVS
 					defaultUVS := groupItem[1].(*CmapFormatDefaultUVS)
 					varSel := defaultUVS.VarSelector
 					rec := varSelectors[varSel]
 					rec.defaultUVS = append(rec.defaultUVS, defaultUVS)
 					varSelectors[varSel] = rec
 				} else if typeVal == 1 {
-					// Non-default UVS
 					nonDefaultUVS := groupItem[1].(*CmapFormatNonDefaultUVS)
 					varSel := nonDefaultUVS.VarSelector
 					rec := varSelectors[varSel]
@@ -1606,32 +1560,20 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					varSelectors[varSel] = rec
 				}
 			}
-
-			// Sort varSelectors by key for consistent output
 			var varSelectorKeys []int
 			for k := range varSelectors {
 				varSelectorKeys = append(varSelectorKeys, k)
 			}
 			sort.Ints(varSelectorKeys)
-
-			// Calculate offsets for variation selector records
-			// First, write variation selector records (header part)
-			headerSize := 4 + 4 + len(varSelectorKeys)*11 // length + numVarSelectorRecords + records
+			headerSize := 4 + 4 + len(varSelectorKeys)*11
 			currentOffset := headerSize
-
 			var varSelectorData []byte
 			var uvsTableData []byte
-
 			for _, varSel := range varSelectorKeys {
 				rec := varSelectors[varSel]
-
-				// Write variation selector (24-bit)
 				varSelectorData = append(varSelectorData, writeUint24(varSel)...)
-
 				defaultUVSOffset := uint32(0)
 				nonDefaultUVSOffset := uint32(0)
-
-				// Calculate and write default UVS table if present
 				var defaultUVSData []byte
 				if len(rec.defaultUVS) > 0 {
 					defaultUVSOffset = uint32(currentOffset)
@@ -1643,8 +1585,6 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					}
 					currentOffset += len(defaultUVSData)
 				}
-
-				// Calculate and write non-default UVS table if present
 				var nonDefaultUVSData []byte
 				if len(rec.nonDefaultUVS) > 0 {
 					nonDefaultUVSOffset = uint32(currentOffset)
@@ -1655,18 +1595,43 @@ func WriteCmap(cmap *Cmap) (data []byte, err error) {
 					}
 					currentOffset += len(nonDefaultUVSData)
 				}
-
 				varSelectorData = append(varSelectorData, writeUint32(defaultUVSOffset)...)
 				varSelectorData = append(varSelectorData, writeUint32(nonDefaultUVSOffset)...)
-
 				uvsTableData = append(uvsTableData, defaultUVSData...)
 				uvsTableData = append(uvsTableData, nonDefaultUVSData...)
 			}
+			buf = append(buf, varSelectorData...)
+			buf = append(buf, uvsTableData...)
+		default:
+			return nil, errors.New("cmap format " + strconv.Itoa(int(format)) + " not supported for write")
+		}
+		return buf, nil
+	}
 
-			data = append(data, varSelectorData...)
-			data = append(data, uvsTableData...)
+	numSubtables := len(cmap.SubTables)
+	subTableData := make([][]byte, numSubtables)
+	for i, subTable := range cmap.SubTables {
+		subTableData[i], err = writeSubTable(subTable)
+		if err != nil {
+			return nil, err
 		}
 	}
+
+	data = append(data, writeUint16(cmap.Version)...)
+	data = append(data, writeUint16(uint16(numSubtables))...)
+
+	currentOffset := uint32(4 + numSubtables*8)
+	for i, subTable := range cmap.SubTables {
+		data = append(data, writeUint16(subTable["platformID"].(uint16))...)
+		data = append(data, writeUint16(subTable["platformSpecificID"].(uint16))...)
+		data = append(data, writeUint32(currentOffset)...)
+		currentOffset += uint32(len(subTableData[i]))
+	}
+
+	for _, subData := range subTableData {
+		data = append(data, subData...)
+	}
+
 	return
 }
 

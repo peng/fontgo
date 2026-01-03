@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type TagItem struct {
@@ -166,10 +167,128 @@ func (f *Font) Write(filePath string) (err error) {
 		return sum
 	}
 
-	// rewrite offset table
+	// prepare table data, skipping missing entries with a warning
+	tablesData := map[string][]byte{}
+	actualTables := make([]string, 0, len(supportTable))
+	var locaFromGlyphs []int
+	for _, tag := range supportTable {
+		var td []byte
+		switch tag {
+		case "cmap":
+			if fontInfo.Tables.Cmap == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td, err = WriteCmap(fontInfo.Tables.Cmap)
+			if err != nil {
+				log.Printf("[WARN] table %s write failed: %v", tag, err)
+				continue
+			}
+		case "fvar":
+			if fontInfo.Tables.Fvar == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteFvar(fontInfo.Tables.Fvar)
+		case "glyf":
+			if fontInfo.Glyphs == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			numGlyphs := int(fontInfo.Tables.Maxp.NumGlyphs)
+			td, locaFromGlyphs, err = WriteGlyphs(fontInfo.Glyphs, numGlyphs)
+			if err != nil {
+				log.Printf("[WARN] table %s write failed: %v", tag, err)
+				continue
+			}
+		case "head":
+			if fontInfo.Tables.Head == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			head := *fontInfo.Tables.Head
+			head.CheckSumAdjustment = 0
+			td = WriteHead(&head)
+		case "hhea":
+			if fontInfo.Tables.Hhea == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteHhea(fontInfo.Tables.Hhea)
+		case "hmtx":
+			if fontInfo.Tables.Hmtx == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteHmtx(fontInfo.Tables.Hmtx)
+		case "kern":
+			if fontInfo.Tables.Kern == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteKern(fontInfo.Tables.Kern)
+		case "Ltag":
+			if fontInfo.Tables.Ltag == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteLtag(fontInfo.Tables.Ltag)
+		case "loca":
+			if fontInfo.Tables.Head == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			locaData := fontInfo.Tables.Loca
+			if len(locaFromGlyphs) > 0 {
+				locaData = locaFromGlyphs
+			}
+			td = WriteLoca(locaData, fontInfo.Tables.Head.IndexToLocFormat)
+		case "maxp":
+			if fontInfo.Tables.Maxp == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteMaxp(fontInfo.Tables.Maxp)
+		case "meta":
+			if fontInfo.Tables.Meta == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteMeta(fontInfo.Tables.Meta)
+		case "name":
+			if fontInfo.Tables.Name == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteName(fontInfo.Tables.Name)
+		case "OS/2":
+			if fontInfo.Tables.Os2 == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WriteOS2(fontInfo.Tables.Os2)
+		case "post":
+			if fontInfo.Tables.Post == nil {
+				log.Printf("[WARN] table %s data missing, continue", tag)
+				continue
+			}
+			td = WritePost(fontInfo.Tables.Post)
+		default:
+			log.Printf("[WARN] table %s not handled, continue", tag)
+			continue
+		}
+
+		tablesData[tag] = td
+		actualTables = append(actualTables, tag)
+	}
+
+	// Sort actualTables to match WriteTableContent order (TrueType spec requires sorted tags)
+	sort.Strings(actualTables)
+
+	// rewrite offset table using only the tables we actually have
 	cpOffsetTable := &OffsetTable{}
 	cpOffsetTable.ScalerType = fontInfo.OffsetTable.ScalerType
-	cpOffsetTable.NumTables = uint16(len(supportTable))
+	cpOffsetTable.NumTables = uint16(len(actualTables))
 
 	maxPowerOf2 := uint16(1)
 	entrySelector := uint16(0)
@@ -184,39 +303,13 @@ func (f *Font) Write(filePath string) (err error) {
 	offsetTableData := WriteOffsetTable(cpOffsetTable)
 	data = append(data, offsetTableData...)
 
-	// rewrite tableContent table directory
-	// write support tables first
-	tablesData := map[string][]byte{}
-	tablesData["cmap"], err = WriteCmap(fontInfo.Tables.Cmap)
-	if err != nil {
-		return
-	}
-	tablesData["fvar"] = WriteFvar(fontInfo.Tables.Fvar)
-	tablesData["glyf"], err = WriteGlyphs(fontInfo.Glyphs)
-	if err != nil {
-		return
-	}
-	head := *fontInfo.Tables.Head
-	head.CheckSumAdjustment = 0
-	tablesData["head"] = WriteHead(&head)
-	tablesData["hhea"] = WriteHhea(fontInfo.Tables.Hhea)
-	tablesData["hmtx"] = WriteHmtx(fontInfo.Tables.Hmtx)
-	tablesData["kern"] = WriteKern(fontInfo.Tables.Kern)
-	tablesData["Ltag"] = WriteLtag(fontInfo.Tables.Ltag)
-	tablesData["loca"] = WriteLoca(fontInfo.Tables.Loca, fontInfo.Tables.Head.IndexToLocFormat)
-	tablesData["maxp"] = WriteMaxp(fontInfo.Tables.Maxp)
-	tablesData["meta"] = WriteMeta(fontInfo.Tables.Meta)
-	tablesData["name"] = WriteName(fontInfo.Tables.Name)
-	tablesData["OS/2"] = WriteOS2(fontInfo.Tables.Os2)
-	tablesData["post"] = WritePost(fontInfo.Tables.Post)
-
-	// table directory size
-	tableDirSize := len(supportTable) * 16
+	// table directory size now depends on actual tables only
+	tableDirSize := len(actualTables) * 16
 	nextOffset := uint32(len(offsetTableData) + tableDirSize)
 
 	// Build the directory entries and output using WriteTableContent
-	cpTableContent := make(map[string]*TagItem, len(supportTable))
-	for _, tag := range supportTable {
+	cpTableContent := make(map[string]*TagItem, len(actualTables))
+	for _, tag := range actualTables {
 		td := tablesData[tag]
 		length := uint32(len(td))
 		checkSum := computeCheckSum(td)
@@ -230,44 +323,9 @@ func (f *Font) Write(filePath string) (err error) {
 
 	data = append(data, WriteTableContent(cpTableContent)...)
 
-	// append table payloads with padding, regenerate and write data according to cpTableContent
-	for _, tag := range supportTable {
-		var td []byte
-		switch tag {
-		case "cmap":
-			td, _ = WriteCmap(fontInfo.Tables.Cmap)
-		case "fvar":
-			td = WriteFvar(fontInfo.Tables.Fvar)
-		case "glyf":
-			td, _ = WriteGlyphs(fontInfo.Glyphs)
-		case "head":
-			head := *fontInfo.Tables.Head
-			head.CheckSumAdjustment = 0
-			td = WriteHead(&head)
-		case "hhea":
-			td = WriteHhea(fontInfo.Tables.Hhea)
-		case "hmtx":
-			td = WriteHmtx(fontInfo.Tables.Hmtx)
-		case "kern":
-			td = WriteKern(fontInfo.Tables.Kern)
-		case "Ltag":
-			td = WriteLtag(fontInfo.Tables.Ltag)
-		case "loca":
-			td = WriteLoca(fontInfo.Tables.Loca, fontInfo.Tables.Head.IndexToLocFormat)
-		case "maxp":
-			td = WriteMaxp(fontInfo.Tables.Maxp)
-		case "meta":
-			td = WriteMeta(fontInfo.Tables.Meta)
-		case "name":
-			td = WriteName(fontInfo.Tables.Name)
-		case "OS/2":
-			td = WriteOS2(fontInfo.Tables.Os2)
-		case "post":
-			td = WritePost(fontInfo.Tables.Post)
-		default:
-			log.Printf("[WARN] table %s data missing during payload write, skip", tag)
-			td = []byte{}
-		}
+	// append table payloads with padding, using cached data from actualTables
+	for _, tag := range actualTables {
+		td := tablesData[tag]
 		data = append(data, td...)
 		padLen := pad4(len(td)) - len(td)
 		if padLen > 0 {
