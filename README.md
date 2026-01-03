@@ -1,5 +1,7 @@
 # Font Go
 
+Font Go is a Go library for reading, subsetting, and writing font files. It supports various font formats TTF.
+
 ```go
 package main
 
