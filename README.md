@@ -22,9 +22,6 @@ func main() {
     // only get some word font
     f.Subset(["a", "b"])
 
-    // convert font format
-    f.Convert("svg", opt)
-
     // write font
     if err := f.Write("font.woff"); err != nil {
         fmt.Println(err)
