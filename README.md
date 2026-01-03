@@ -7,7 +7,7 @@ package main
 
 import (
     "fmt"
-    "github.com/peng/fontgo"
+    "github.com/peng/fontgo/font"
 )
 
 func main() {
