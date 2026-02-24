@@ -1,6 +1,6 @@
 # Font Go
 
-Font Go is a Go library for reading, subsetting, and writing font files. It supports various font formats TTF.
+Font Go is a Go library for reading, subsetting, and writing font files. It supports only font formats TTF.
 
 ```go
 package main
@@ -21,7 +21,7 @@ func main() {
     // will get font struct
     f.GetFontInfo()
 
-    // only get some word font
+    // only get some word font，this will reduce the font size, and only keep the "a" and "b" word font
     f.Subset(["a", "b"])
 
     // write font
